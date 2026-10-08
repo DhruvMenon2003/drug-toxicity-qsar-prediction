@@ -1,0 +1,8 @@
+httpcache/
+.scrapy/
+__pycache__/
+.pytest_cache/
+output/log_*.txt
+.pw-profile/
+# outputs contain DrugBank-derived fields; kept out of this public repo (DrugBank terms)
+output/

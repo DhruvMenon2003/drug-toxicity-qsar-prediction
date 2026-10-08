@@ -1,0 +1,9 @@
+# Python 3.10-3.13 recommended (3.11 tested on Windows/Anaconda). Python 3.14 needs Scrapy >= 2.16.
+scrapy>=2.13
+scrapy-playwright>=0.0.43
+playwright>=1.40
+pubchempy>=1.0.4
+pandas>=2.0
+openpyxl>=3.1
+rdkit>=2023.9
+pytest>=8
