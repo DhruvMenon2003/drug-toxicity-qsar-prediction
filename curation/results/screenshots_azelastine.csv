@@ -1,4 +1,4 @@
 file,url,http_status,route_in_xml,route_on_page,taken_utc
-evidence/screenshots/dailymed_intraocular_77a33738-ffcf-221c-1562-780418882e5d.png,https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=77a33738-ffcf-221c-1562-780418882e5d,200,INTRAOCULAR,INTRAOCULAR,2026-10-09T03:54:23+00:00
-evidence/screenshots/dailymed_ophthalmic_72406ded-7886-41fb-b5c8-2d27a149aa34.png,https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=72406ded-7886-41fb-b5c8-2d27a149aa34,200,OPHTHALMIC,OPHTHALMIC,2026-10-09T03:54:24+00:00
-evidence/screenshots/whocc_S01GX07.png,https://atcddd.fhi.no/atc_ddd_index/?code=S01GX07&showdescription=no,200,,S01GX07 AZELASTINE listed: True,2026-10-09T03:54:25+00:00
+evidence/screenshots/dailymed_intraocular_77a33738-ffcf-221c-1562-780418882e5d.png,https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=77a33738-ffcf-221c-1562-780418882e5d,200,INTRAOCULAR,INTRAOCULAR,2026-10-09T03:55:46+00:00
+evidence/screenshots/dailymed_ophthalmic_72406ded-7886-41fb-b5c8-2d27a149aa34.png,https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=72406ded-7886-41fb-b5c8-2d27a149aa34,200,OPHTHALMIC,OPHTHALMIC,2026-10-09T03:55:47+00:00
+evidence/screenshots/whocc_S01GX07.png,https://atcddd.fhi.no/atc_ddd_index/?code=S01GX07&showdescription=no,200,,S01GX07 AZELASTINE listed: True,2026-10-09T03:55:48+00:00
