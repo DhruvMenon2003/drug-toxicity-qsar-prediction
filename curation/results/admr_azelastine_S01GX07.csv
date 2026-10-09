@@ -1,2 +1,3 @@
 CID,GenericName,ATC,AdmR_before,AdmR,AdmR_short_name,AdmR_fda_code,AdmR_nci_concept_id,Edit_Flag,evidence
-2267,azelastine,S01GX07,NaN,OPHTHALMIC,OPHTHALM,012,C38287,filled_from_DailyMed_route_field; 6 label(s) coded INTRAOCULAR corrected,9 of 47 DailyMed labels for azelastine list this route
+2267,azelastine,S01GX07,NaN,INTRAOCULAR,I-OCUL,036,C38255,filled_from_DailyMed_route_field,6 of 47 DailyMed labels for azelastine list this route
+2267,azelastine,S01GX07,NaN,OPHTHALMIC,OPHTHALM,012,C38287,filled_from_DailyMed_route_field,3 of 47 DailyMed labels for azelastine list this route
