@@ -22,7 +22,7 @@ import requests, pandas as pd
 REPO = "https://raw.githubusercontent.com/DhruvMenon2003/drug-toxicity-qsar-prediction/main/curation/inputs/"
 DRUGBANK_FILE = "Drug Bank Dataset.tsv.md"
 OUT = "curated"
-DROP_EXACT_DUPLICATES = False   # the source file repeats its table; set True to keep one copy of each identical row
+DROP_EXACT_DUPLICATES = True    # Star, 2026-10-09: the source file repeats its table; keep one copy of each identical row
 os.makedirs(OUT, exist_ok=True)
 try:   # optional openFDA key from Colab Secrets (key icon in the left bar, name FDA_API_KEY); never paste it into code
     from google.colab import userdata
