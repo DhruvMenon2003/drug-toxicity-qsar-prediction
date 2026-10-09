@@ -84,7 +84,8 @@ atc_names = {}
 for l3 in sorted(db.ATC.str[:4].unique()):
     r = get(f"https://atcddd.fhi.no/atc_ddd_index/?code={l3}&showdescription=no")
     for code, label in re.findall(r'<a href="\./\?code=([A-Z0-9]+)&showdescription=(?:no|yes)">([^<]+)</a>', r.text if r else ""):
-        atc_names.setdefault(code, label.strip())
+        if "text from Guidelines" not in label:          # the page's "Show text from Guidelines" link uses the same href
+            atc_names.setdefault(code, label.strip())
 for n, k in [(1, 1), (2, 3), (3, 4)]:
     db[f"ATC_L{n}"] = db.ATC.str[:k]
     db[f"ATC_L{n}_name"] = db[f"ATC_L{n}"].map(atc_names)
