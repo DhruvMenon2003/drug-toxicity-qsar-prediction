@@ -1,0 +1,28 @@
+route_code,route,group,who_ddd_code,label_pattern,form_pattern,source
+O,oral,enteral,O,\bORAL,TABLET|CAPSULE|SYRUP|ELIXIR|GRANULE,Pharmacology Mentor: Oral Route
+SL,sublingual,enteral,SL,SUBLINGUAL,,Pharmacology Mentor: Sublingual Route
+BUC,buccal,enteral,,BUCCAL,,Pharmacology Mentor: Buccal Route
+R,rectal,enteral,R,RECTAL,SUPPOSITORY|ENEMA,Pharmacology Mentor: Rectal Route
+IV,intravenous,parenteral,P,INTRAVENOUS,,Pharmacology Mentor: Intravenous Route
+IM,intramuscular,parenteral,P,INTRAMUSCULAR,,Pharmacology Mentor: Intramuscular Route
+SC,subcutaneous,parenteral,P,SUBCUTANEOUS,,Pharmacology Mentor: Subcutaneous Route
+ID,intradermal,parenteral,P,INTRADERMAL,,Pharmacology Mentor: Intradermal Route
+P,"parenteral, route not specified",parenteral,P,PARENTERAL,INJECTION|INJECTABLE,WHO DDD code P (coarse; refine when the label names the route)
+TD,transdermal,other,TD,TRANSDERMAL,PATCH,Pharmacology Mentor: Transdermal Route
+INH,inhalational,other,Inhal,INHALATION|INHALANT|INHALER,AEROSOL|NEBULI,Pharmacology Mentor: Inhalational Route
+TOP,topical (skin),other,,TOPICAL,CREAM|OINTMENT|GEL|LOTION|FOAM,Pharmacology Mentor: Topical Route
+N,intranasal,other,N,NASAL,SPRAY,Pharmacology Mentor: Intranasal Route
+OPH,ocular (ophthalmic),other,,OPHTHALMIC|\bEYE\b,SOLUTION/ ?DROPS,Pharmacology Mentor: Ocular Route
+OT,otic,other,,OTIC|\bEAR\b,,Pharmacology Mentor: Otic Route
+V,vaginal,other,V,VAGINAL,,Pharmacology Mentor: Vaginal Route
+IT,intrathecal,specialised,P,INTRATHECAL,,Pharmacology Mentor: Specialised Routes (Table 1)
+EPI,epidural,specialised,P,EPIDURAL,,Pharmacology Mentor: Specialised Routes (Table 1)
+IO,intraosseous,specialised,P,INTRAOSSEOUS,,Pharmacology Mentor: Specialised Routes (Table 1)
+IAR,intra-articular,specialised,P,INTRA-ARTICULAR|INTRAARTICULAR,,Pharmacology Mentor: Specialised Routes (Table 1)
+IART,intra-arterial,specialised,P,INTRA-ARTERIAL|INTRAARTERIAL,,Pharmacology Mentor: Specialised Routes (Table 1)
+IP,intraperitoneal,specialised,P,INTRAPERITONEAL,,Pharmacology Mentor: Specialised Routes (Table 1)
+IVES,intravesical,specialised,intravesical,INTRAVESICAL,,Pharmacology Mentor: Specialised Routes (Table 1)
+ICV,intraventricular,specialised,P,INTRAVENTRICULAR,,Pharmacology Mentor: Specialised Routes (Table 1)
+ICAM,intracameral,specialised,,INTRACAMERAL,,Pharmacology Mentor: Specialised Routes (Table 1)
+URE,urethral,other,urethral,URETHRAL,,WHO DDD code already in the table (not in the article)
+IMPL,implant,other,implant,IMPLANT,,WHO DDD code already in the table (not in the article)
