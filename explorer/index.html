@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Drug Hansch Space</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/smiles-drawer@2.1.7/dist/smiles-drawer.min.js"></script>
+</head>
+<body>
+
+<div class="app" id="app">
+  <header class="masthead">
+    <div class="brand">
+      <h1>Drug Hansch Space</h1>
+      <p class="sub"><span id="m-count">759</span> approved drugs from the curated DrugBank set, placed by PubChem descriptors</p>
+    </div>
+    <nav class="jump" aria-label="Sections">
+      <a href="#tour">Tour</a>
+      <a href="#explore">Explore</a>
+      <a href="#hansch">Hansch fits</a>
+      <a href="#method">Method</a>
+    </nav>
+  </header>
+
+  <div class="layout">
+    <section class="stage" id="stage" aria-label="3D chemical space">
+      <div class="stage-inner">
+        <canvas id="space" aria-label="3D scatter of drugs; use the search box or the data table to pick a drug"></canvas>
+        <div id="labels" class="labels" aria-hidden="true"></div>
+        <div class="hud">
+          <div class="axis-key" id="axis-key"></div>
+          <div class="legend" id="legend"></div>
+        </div>
+        <div class="tooltip" id="tooltip" role="status" hidden></div>
+        <div class="stage-status" id="stage-status">Loading PubChem data…</div>
+        <div class="stage-tools">
+          <button type="button" id="btn-reset" class="ghost" title="Reset the camera">Reset view</button>
+          <button type="button" id="btn-spin" class="ghost" aria-pressed="false" title="Turn the scene slowly">Spin</button>
+        </div>
+      </div>
+    </section>
+
+    <main class="rail">
+      <section id="tour" class="tour" aria-label="Guided tour">
+        <article class="step" data-step="space">
+          <p class="eyebrow">Step 1 of 7 · Chemical space</p>
+          <h2>Every sphere is one drug</h2>
+          <p>Each point is a drug from the curated DrugBank table (one point per PubChem compound, salts removed). Its position comes from a principal component analysis of nine PubChem and RDKit descriptors, so drugs with similar size, polarity and lipophilicity sit close together.</p>
+          <p class="fig" id="t-pca"></p>
+          <p class="hint">Drag to turn the space, pinch or Ctrl + scroll to zoom, and hover or tap a sphere to name it.</p>
+        </article>
+
+        <article class="step" data-step="logp">
+          <p class="eyebrow">Step 2 of 7 · Hydrophobicity</p>
+          <h2>log P, the π term</h2>
+          <p>Hansch and Fujita (1964) wrote biological activity as a function of hydrophobicity, electronic effects and size: <span class="eq">log 1/C = −k π² + k′ π + ρ σ + k″</span>. A drug has to partition into membranes to reach its target, so potency often rises with log P and then falls again once the molecule is too greasy to leave the membrane.</p>
+          <p>The points now spread along one axis only: PubChem XLogP3.</p>
+          <p class="fig" id="t-logp"></p>
+        </article>
+
+        <article class="step" data-step="mr">
+          <p class="eyebrow">Step 3 of 7 · Size</p>
+          <h2>Molar refractivity, the steric term</h2>
+          <p>Molar refractivity (MR, cm³/mol) tracks molecular volume and polarisability. In Hansch equations it stands in for the bulk that has to fit the binding site. Seen from above, log P and MR are only loosely related: big molecules are not automatically greasy.</p>
+          <p class="fig" id="t-mr"></p>
+        </article>
+
+        <article class="step" data-step="tpsa">
+          <p class="eyebrow">Step 4 of 7 · Polarity</p>
+          <h2>Polar surface area and the oral route</h2>
+          <p>Topological polar surface area (TPSA, Å²) adds the third axis. It is a whole-molecule stand-in for hydrogen bonding, not a Hammett σ. Veber et al. (2002) found that oral absorption drops above 140 Å², drawn here as a plane. Blue spheres are drugs with an oral route in the curated table.</p>
+          <p class="fig" id="t-tpsa"></p>
+        </article>
+
+        <article class="step" data-step="activity">
+          <p class="eyebrow">Step 5 of 7 · Activity</p>
+          <h2>Potency at the mechanism target</h2>
+          <p>The vertical axis now shows activity: the median ChEMBL pChEMBL value (−log₁₀ molar IC50, Ki, EC50 or Kd) at the drug's mechanism target, kept only when at least two publications agree. Drugs without a value leave the scene.</p>
+          <p class="fig" id="t-act"></p>
+        </article>
+
+        <article class="step" data-step="series">
+          <p class="eyebrow">Step 6 of 7 · One target</p>
+          <h2 id="t-series-h">A series that shares a target</h2>
+          <p id="t-series"></p>
+          <p class="fig eq-block" id="t-series-eq"></p>
+          <p>The surface is the fitted equation. Each thin line joins a drug to the surface, so its length is the residual.</p>
+        </article>
+
+        <article class="step" data-step="all">
+          <p class="eyebrow">Step 7 of 7 · Many targets</p>
+          <h2>Mixing targets breaks the model</h2>
+          <p id="t-all"></p>
+          <p class="fig eq-block" id="t-all-eq"></p>
+          <p>Hansch analysis assumes one mechanism and a congeneric series. Across unrelated targets, potency depends on the binding site far more than on bulk physical properties.</p>
+        </article>
+      </section>
+
+      <section id="explore" class="panel" aria-labelledby="explore-h">
+        <h2 id="explore-h">Explore</h2>
+        <p class="lede">Choose the three axes and the colour, narrow the set by ATC group or route, or find a drug by name.</p>
+        <div class="controls">
+          <div class="field"><label for="ax-x">X axis</label><select id="ax-x"></select></div>
+          <div class="field"><label for="ax-y">Y axis (up)</label><select id="ax-y"></select></div>
+          <div class="field"><label for="ax-z">Z axis (depth)</label><select id="ax-z"></select></div>
+          <div class="field"><label for="color-by">Colour</label>
+            <select id="color-by">
+              <option value="single">One colour</option>
+              <option value="atc">ATC anatomical group</option>
+              <option value="oral">Oral route or not</option>
+              <option value="act">Activity (pChEMBL)</option>
+              <option value="ro5">Rule-of-five violations</option>
+            </select>
+          </div>
+          <div class="field wide" id="atc-pick-wrap"><span class="label">Highlight up to three ATC groups</span><div class="chips" id="atc-pick" role="group" aria-label="ATC groups to highlight"></div></div>
+          <div class="field"><label for="f-l1">ATC level 1</label><select id="f-l1"><option value="">All groups</option></select></div>
+          <div class="field"><label for="f-l2">ATC level 2</label><select id="f-l2"><option value="">All</option></select></div>
+          <div class="field"><label for="f-l3">ATC level 3</label><select id="f-l3"><option value="">All</option></select></div>
+          <div class="field"><label for="f-route">Route</label><select id="f-route"><option value="">All routes</option></select></div>
+          <div class="field wide"><label for="search">Find a drug</label>
+            <input id="search" type="search" list="drug-names" placeholder="e.g. dexamethasone" autocomplete="off">
+            <datalist id="drug-names"></datalist>
+          </div>
+        </div>
+        <p class="count" id="count" aria-live="polite"></p>
+      </section>
+
+      <section id="detail" class="panel detail" aria-labelledby="detail-h" aria-live="polite">
+        <h2 id="detail-h">Drug</h2>
+        <p class="lede" id="detail-empty">Click a sphere or search for a drug to see its PubChem 3D conformer, ATC codes and descriptors.</p>
+        <div id="detail-body" hidden>
+          <div class="drug-head">
+            <h3 id="d-name"></h3>
+            <p class="drug-ids" id="d-ids"></p>
+          </div>
+          <div class="mol-wrap">
+            <canvas id="mol" aria-label="3D conformer, ball and stick"></canvas>
+            <div class="mol-tools">
+              <span class="mol-src" id="d-src"></span>
+              <label class="check"><input type="checkbox" id="show-h" checked> Hydrogens</label>
+            </div>
+          </div>
+          <div class="depict" id="d-2d" aria-label="2D structure"></div>
+          <dl class="kv" id="d-desc"></dl>
+          <div id="d-act"></div>
+          <h4>ATC codes and routes</h4>
+          <ul class="atc-list" id="d-atc"></ul>
+          <p class="flags" id="d-flags"></p>
+        </div>
+      </section>
+
+      <section id="hansch" class="panel" aria-labelledby="hansch-h">
+        <h2 id="hansch-h">Hansch fits</h2>
+        <p class="lede">Drugs are grouped by their first ChEMBL mechanism target. A group with at least five drugs gets the regression with the best leave-one-out q², allowing one descriptor per five drugs.</p>
+        <div class="field wide"><label for="h-group">Target group</label><select id="h-group"></select></div>
+        <div id="h-out"></div>
+        <figure class="obs-pred">
+          <svg id="h-plot" viewBox="0 0 320 260" role="img" aria-labelledby="h-plot-cap"></svg>
+          <figcaption id="h-plot-cap">Observed against leave-one-out predicted pChEMBL. Points on the diagonal are predicted perfectly.</figcaption>
+        </figure>
+        <button type="button" id="h-show" class="primary">Show this fit in 3D</button>
+        <details class="cands"><summary>All models tried</summary><div id="h-cands"></div></details>
+      </section>
+
+      <section class="panel" aria-labelledby="table-h">
+        <details id="table-details">
+          <summary><h2 id="table-h">Data table</h2></summary>
+          <p class="lede">The drugs in the current view with the three axis values. Click a row to select the drug.</p>
+          <div class="table-wrap"><table id="table"><thead></thead><tbody></tbody></table></div>
+        </details>
+      </section>
+
+      <section id="method" class="panel method" aria-labelledby="method-h">
+        <h2 id="method-h">Method and checks</h2>
+        <ul>
+          <li><strong>Drugs.</strong> One point per PubChem compound in <code>drugbank_curated_dedup.csv</code> (curation/colab_curate_all.py). The curated SMILES is the neutral parent; its InChIKey finds the parent CID in PubChem.</li>
+          <li><strong>Descriptors.</strong> PubChem PUG REST: XLogP3, TPSA, molecular weight, H-bond donors and acceptors, rotatable bonds, complexity. RDKit on the curated SMILES: Crippen log P and molar refractivity, aromatic rings, Fsp3.</li>
+          <li><strong>3D conformers.</strong> PubChem's first 3D conformer where one exists; otherwise RDKit ETKDGv3 with an MMFF clean-up, labelled as such.</li>
+          <li><strong>Activity.</strong> Median ChEMBL pChEMBL at the mechanism target, needing two or more documents. Toxicity is still empty in the source table.</li>
+          <li><strong>Regressions.</strong> Ordinary least squares on log P, log P², MR and TPSA. Model choice by leave-one-out q²; chance correlation checked by refitting on 100 shuffled activity vectors.</li>
+        </ul>
+        <p id="m-checks" class="checks"></p>
+        <p class="small">Rebuild the data with <code>python explorer/build_data.py</code>. Every PubChem and WHO request it makes is listed in <code>explorer/data/provenance.csv</code>, and the cross-checks are in <code>explorer/data/validation.md</code>.</p>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
