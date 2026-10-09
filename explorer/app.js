@@ -1,4 +1,4 @@
-// Drug Hansch Space: a scroll-driven 3D scatter of the curated drugs in PubChem descriptor space, with Hansch-type fits.
+// Drug Hansch Space: a scroll-driven 3D scatter of the curated drugs in RDKit descriptor space, with Hansch-type fits.
 // Data come from explorer/build_data.py (data/drugs.json, data/hansch.json, data/molecules.json); nothing is computed
 // from the network at view time except the 2D depictions, which SmilesDrawer draws from the curated SMILES.
 import * as THREE from 'three';
@@ -29,13 +29,16 @@ const AX = {
   pc1: { label: 'PC1', get: d => d.pc?.[0], dec: 1 },
   pc2: { label: 'PC2', get: d => d.pc?.[1], dec: 1 },
   pc3: { label: 'PC3', get: d => d.pc?.[2], dec: 1 },
-  logp: { label: 'log P', unit: '', get: d => d.d.logp, dec: 1, long: 'log P (XLogP3, Crippen if missing)' },
+  logp: { label: 'log P', unit: '', get: d => d.d.logp, dec: 1, long: 'log P (Crippen, RDKit)' },
+  xlogp: { label: 'XLogP3', get: d => d.d.xlogp, dec: 1, long: 'XLogP3 (PubChem)' },
+  ts1: { label: 'Structure map 1', get: d => d.ts?.[0], dec: 0, arbitrary: true, long: 'Structure map, t-SNE 1 (Morgan count fingerprints)' },
+  ts2: { label: 'Structure map 2', get: d => d.ts?.[1], dec: 0, arbitrary: true, long: 'Structure map, t-SNE 2 (Morgan count fingerprints)' },
   mr: { label: 'MR', unit: 'cm³/mol', get: d => d.d.mr, dec: 0, long: 'Molar refractivity (cm³/mol)' },
   tpsa: { label: 'TPSA', unit: 'Å²', get: d => d.d.tpsa, dec: 0, long: 'Topological polar surface area (Å²)' },
   act: { label: 'pChEMBL', get: d => d.act?.p, dec: 1, long: 'Activity at the mechanism target (pChEMBL)' },
   mw: { label: 'MW', unit: 'Da', get: d => d.d.mw, dec: 0, long: 'Molecular weight (Da)' },
-  hbd: { label: 'HBD', get: d => d.d.hbd, dec: 0, long: 'Hydrogen-bond donors' },
-  hba: { label: 'HBA', get: d => d.d.hba, dec: 0, long: 'Hydrogen-bond acceptors' },
+  hbd: { label: 'HBD', get: d => d.d.hbd, dec: 0, long: 'Hydrogen-bond donors (NH + OH)' },
+  hba: { label: 'HBA', get: d => d.d.hba, dec: 0, long: 'Hydrogen-bond acceptors (N + O)' },
   rotb: { label: 'Rotatable bonds', get: d => d.d.rotb, dec: 0 },
   arom: { label: 'Aromatic rings', get: d => d.d.arom, dec: 0 },
   fsp3: { label: 'Fsp3', get: d => d.d.fsp3, dec: 2, long: 'Fraction of sp3 carbons' },
@@ -48,7 +51,7 @@ const axLong = k => AX[k].long || AX[k].label;
 // ---------------------------------------------------------------- state
 const app = {
   drugs: [], byCid: new Map(), meta: null, hansch: null, groups: new Map(), mols: null, molsPromise: null,
-  view: { x: 'pc1', y: 'pc2', z: 'pc3', color: 'atc', atc: [null, null, null], l1: '', l2: '', l3: '', route: '', group: null, veber: false },
+  view: { x: 'pc1', y: 'pc2', z: 'pc3', color: 'atc', atc: [null, null, null], l1: '', l2: '', l3: '', route: '', small: false, group: null, veber: false },
   scales: null, visible: [], selected: -1, hover: -1, tokens: {}, step: null, seriesId: null,
 };
 
@@ -158,6 +161,26 @@ function frame() {
   } else ring.visible = selLabel.visible = false;
   stage.renderer.render(stage.scene, camera);
   stage.labels.render(stage.scene, camera);
+  keepTitlesInside();
+}
+
+// Axis titles hang off the axis ends; slide any that would run past the stage edge back inside it, and below the legend
+// or the buttons if they would sit on them. The CSS translate property composes with the transform CSS2DRenderer
+// writes every frame, so the two do not fight.
+function keepTitlesInside() {
+  const host = stage.labels.domElement, box = host.getBoundingClientRect();
+  const keepOut = ['.hud', '.stage-tools'].map(q => $(q).getBoundingClientRect()).filter(r => r.width && r.height);
+  for (const el of host.querySelectorAll('.ax-title')) {
+    const r = el.getBoundingClientRect();
+    if (!r.width) continue;
+    const [wx, wy] = (el.dataset.shift || '0 0').split(' ').map(Number);
+    const left = r.left - wx, right = r.right - wx, top = r.top - wy, bottom = r.bottom - wy;
+    const x = Math.round(Math.max(box.left + 8 - left, Math.min(0, box.right - 8 - right)));
+    let y = 0;
+    for (const k of keepOut) if (left + x < k.right && right + x > k.left && top + y < k.bottom && bottom + y > k.top) y = Math.round(k.bottom + 6 - top);
+    const shift = `${x} ${y}`;
+    if (shift !== (el.dataset.shift || '0 0')) { el.dataset.shift = shift; el.style.translate = x || y ? `${x}px ${y}px` : ''; }
+  }
 }
 
 // ---------------------------------------------------------------- scales and layout
@@ -179,19 +202,20 @@ function makeScale(key, list) {
   return { lo, hi, step, ticks, map: v => ((v - lo) / (hi - lo)) * 2 * S - S };
 }
 
-function passes(d) {
+function passes(d, axes = true) {
   const v = app.view;
   if (v.l1 && !d.atc.some(a => a.code.startsWith(v.l1))) return false;
   if (v.l2 && !d.atc.some(a => a.code.startsWith(v.l2))) return false;
   if (v.l3 && !d.atc.some(a => a.code.startsWith(v.l3))) return false;
   if (v.route && !d.routes.includes(v.route)) return false;
+  if (v.small && !(d.d.mw <= app.hansch.max_mw)) return false;
   if (v.group && !app.groups.get(v.group)?.cids.has(d.cid)) return false;
-  for (const k of [v.x, v.y, v.z]) if (!AX[k].pseudo && !fin(AX[k].get(d))) return false;
+  if (axes) for (const k of [v.x, v.y, v.z]) if (!AX[k].pseudo && !fin(AX[k].get(d))) return false;
   return true;
 }
 
 function layout({ instant = false } = {}) {
-  const v = app.view, list = app.drugs.filter(passes);
+  const v = app.view, list = app.drugs.filter(d => passes(d));
   app.visible = list;
   const vis = new Set(list);
   const sx = makeScale(v.x, list), sy = makeScale(v.y, list), sz = makeScale(v.z, list);
@@ -226,7 +250,8 @@ function layout({ instant = false } = {}) {
 function disposeGroup(g) {
   if (!g) return;
   g.parent?.remove(g);
-  g.traverse(o => { o.geometry?.dispose(); o.material?.dispose?.(); });
+  // CSS2D labels only drop their DOM element when they themselves are removed, not when an ancestor group is
+  g.traverse(o => { o.geometry?.dispose(); o.material?.dispose?.(); if (o.isCSS2DObject) o.element.remove(); });
 }
 function label(text, cls, pos, center = [0.5, 0.5]) {
   const el = document.createElement('div');
@@ -262,17 +287,20 @@ function buildAxes() {
   };
   g.add(mk(grid, T.line, 0.75), mk(frame, T['ink-2'], 0.9));
   const P = (x, y, z) => new THREE.Vector3(x, y, z);
+  // t-SNE units mean nothing, so those axes get no numbers and a short name (the axis key carries the long one);
+  // phone-width stages get the short names throughout
+  const narrow = $('.stage-inner').clientWidth < 600, title = k => narrow || AX[k].arbitrary ? AX[k].label + (AX[k].unit ? ` (${AX[k].unit})` : '') : axLong(k), ticks = (k, sc) => AX[k].arbitrary ? [] : sc.ticks;
   if (!sx.pseudo) {
-    for (const t of sx.ticks) g.add(label(tickText(v.x, t), 'ax-label', P(sx.map(t), -S, S + 0.9)));
-    g.add(label(axLong(v.x), 'ax-title', P(0, -S, S + 2.4)));
+    for (const t of ticks(v.x, sx)) g.add(label(tickText(v.x, t), 'ax-label', P(sx.map(t), -S, S + 0.9)));
+    g.add(label(title(v.x), 'ax-title', P(0, -S, S + 2.4)));
   }
   if (!sz.pseudo) {
-    for (const t of sz.ticks) g.add(label(tickText(v.z, t), 'ax-label', P(S + 0.9, -S, sz.map(t)), [0, 0.5]));
-    g.add(label(axLong(v.z), 'ax-title', P(S + 2.2, -S, 0), [0, 0.5]));
+    for (const t of ticks(v.z, sz)) g.add(label(tickText(v.z, t), 'ax-label', P(S + 0.9, -S, sz.map(t)), [0, 0.5]));
+    g.add(label(title(v.z), 'ax-title', P(S + 2.2, -S, 0), [0, 0.5]));
   }
   if (!sy.pseudo) {
-    for (const t of sy.ticks) g.add(label(tickText(v.y, t), 'ax-label', P(-S - 0.6, sy.map(t), S), [1, 0.5]));
-    g.add(label(axLong(v.y), 'ax-title', P(-S, S + 1.3, S), [0.5, 1]));
+    for (const t of ticks(v.y, sy)) g.add(label(tickText(v.y, t), 'ax-label', P(-S - 0.6, sy.map(t), S), [1, 0.5]));
+    g.add(label(title(v.y), 'ax-title', P(-S + 0.3, S, S), [0, 0]));   // beside the top of the axis, clear of the legend and the canvas edge
   }
   stage.scene.add(g);
   stage.axes = g;
@@ -391,9 +419,13 @@ function renderAxisKey() {
 function renderCount() {
   const v = app.view, n = app.visible.length, total = app.drugs.length;
   const grp = v.group && app.groups.get(v.group);
-  const missing = app.drugs.filter(d => !(v.group && !grp?.cids.has(d.cid)) && [v.x, v.y, v.z].some(k => !AX[k].pseudo && !fin(AX[k].get(d)))).length;
+  const big = d => v.small && !(d.d.mw <= app.hansch.max_mw);
+  const missing = app.drugs.filter(d => !(v.group && !grp?.cids.has(d.cid)) && !big(d) && [v.x, v.y, v.z].some(k => !AX[k].pseudo && !fin(AX[k].get(d)))).length;
+  let nBig = 0;                                  // drugs the size filter alone removes from this view
+  if (v.small && !v.group) { v.small = false; nBig = app.drugs.filter(d => !(d.d.mw <= app.hansch.max_mw) && passes(d, false)).length; v.small = true; }
   let s = `Showing ${n} of ${total} drugs`;
   if (grp) s += ` in the fit for ${grp.fit.id === 'ALL' ? 'all drugs with an activity value' : grp.fit.label}`;
+  if (nBig) s += `; ${nBig} drugs over ${app.hansch.max_mw} Da are left out`;
   if (missing) s += `; ${missing} have no value on one of the axes`;
   $('#count').textContent = s + '.';
 }
@@ -452,19 +484,20 @@ function camTo(pos, { instant = false } = {}) {
 // ---------------------------------------------------------------- the guided tour
 const STEPS = {
   space: { view: { x: 'pc1', y: 'pc2', z: 'pc3', color: 'atc' }, cam: [24, 14, 27] },
-  logp: { view: { x: 'logp', y: 'none', z: 'jitter', color: 'single' }, cam: [0, 22, 26] },
-  mr: { view: { x: 'logp', y: 'none', z: 'mr', color: 'single' }, cam: [0, 37, 3] },
-  tpsa: { view: { x: 'logp', y: 'tpsa', z: 'mr', color: 'oral', veber: true }, cam: [27, 12, 24] },
-  activity: { view: { x: 'logp', y: 'act', z: 'mr', color: 'act' }, cam: [27, 11, 24] },
-  series: { view: { x: 'logp', y: 'act', z: 'mr', color: 'single', group: 'SERIES' }, cam: [25, 12, 26] },
-  all: { view: { x: 'logp', y: 'act', z: 'mr', color: 'single', group: 'ALL' }, cam: [27, 12, 23] },
+  structure: { view: { x: 'ts1', y: 'none', z: 'ts2', color: 'atc' }, cam: [0, 37, 3] },
+  logp: { view: { x: 'logp', y: 'none', z: 'jitter', color: 'single', small: true }, cam: [0, 22, 26] },
+  mr: { view: { x: 'logp', y: 'none', z: 'mr', color: 'single', small: true }, cam: [0, 37, 3] },
+  tpsa: { view: { x: 'logp', y: 'tpsa', z: 'mr', color: 'oral', veber: true, small: true }, cam: [27, 12, 24] },
+  activity: { view: { x: 'logp', y: 'act', z: 'mr', color: 'act', small: true }, cam: [27, 11, 24] },
+  series: { view: { x: 'logp', y: 'act', z: 'mr', color: 'single', group: 'SERIES', small: true }, cam: [25, 12, 26] },
+  all: { view: { x: 'logp', y: 'act', z: 'mr', color: 'single', group: 'ALL', small: true }, cam: [27, 12, 23] },
 };
 function goStep(name) {
   if (app.step === name) return;
   app.step = name;
   document.querySelectorAll('.step').forEach(s => s.classList.toggle('is-active', s.dataset.step === name));
   const st = STEPS[name], gv = st.view.group === 'SERIES' ? app.seriesId : st.view.group ?? null;
-  setView({ l1: '', l2: '', l3: '', route: '', veber: false, ...st.view, group: gv });
+  setView({ l1: '', l2: '', l3: '', route: '', small: false, veber: false, ...st.view, group: gv });
   camTo(st.cam);
 }
 function initTour() {
@@ -472,7 +505,7 @@ function initTour() {
   gsap.registerPlugin(ScrollTrigger);
   document.querySelectorAll('.step').forEach(el => {
     ScrollTrigger.create({
-      trigger: el, start: () => (narrow.matches ? 'top 78%' : 'top 62%'), end: () => (narrow.matches ? 'bottom 78%' : 'bottom 62%'),
+      trigger: el, start: () => (narrow.matches ? 'top 66%' : 'top 62%'), end: () => (narrow.matches ? 'bottom 66%' : 'bottom 62%'),
       onToggle: self => { if (self.isActive) goStep(el.dataset.step); },
     });
   });
@@ -491,6 +524,7 @@ function syncControls() {
   $('#color-by').value = v.color;
   fillAtcSelects();
   $('#f-route').value = v.route;
+  $('#f-small').checked = v.small;
   $('#h-group').value = v.group && app.groups.has(v.group) ? v.group : $('#h-group').value;
 }
 
@@ -529,6 +563,7 @@ function initControls() {
   const routes = [...new Set(app.drugs.flatMap(d => d.routes))].sort();
   $('#f-route').innerHTML = '<option value="">All routes</option>' + routes.map(r => `<option value="${esc(r)}">${esc(cap(r))}</option>`).join('');
   $('#f-route').addEventListener('change', e => setView({ route: e.target.value }));
+  $('#f-small').addEventListener('change', e => setView({ small: e.target.checked, group: null }));
   // search
   $('#drug-names').innerHTML = [...app.drugs].sort((a, b) => a.name.localeCompare(b.name)).map(d => `<option value="${esc(cap(d.name))}">`).join('');
   const find = () => {
@@ -536,7 +571,7 @@ function initControls() {
     if (!q) return;
     const d = app.drugs.find(x => x.name.toLowerCase() === q) || app.drugs.find(x => x.name.toLowerCase().startsWith(q));
     if (d) {
-      if (!passes(d)) setView({ l1: '', l2: '', l3: '', route: '', group: null });
+      if (!passes(d)) setView({ l1: '', l2: '', l3: '', route: '', small: false, group: null });
       selectDrug(d.cid);
     }
   };
@@ -589,10 +624,10 @@ function selectDrug(cid) {
     `<br>${esc(d.ik || '')}${d.d.formula ? ' · ' + esc(d.d.formula) : ''}`;
   const D = d.d, kv = (k, v, small = '') => `<div><dt>${k}</dt><dd>${v}${small ? ` <small>${small}</small>` : ''}</dd></div>`;
   $('#d-desc').innerHTML = [
-    kv('log P', fx(D.logp, 2), D.logp_src?.startsWith('XLogP') ? `XLogP3; Crippen ${fx(D.clogp, 2)}` : 'Crippen'),
+    kv('log P', fx(D.logp, 2), fin(D.xlogp) ? `Crippen; XLogP3 ${fx(D.xlogp, 2)}` : 'Crippen'),
     kv('MR', fx(D.mr, 1), 'cm³/mol'), kv('TPSA', fx(D.tpsa, 1), 'Å²'), kv('MW', fx(D.mw, 1), 'Da'),
     kv('H-bond donors', D.hbd ?? '–'), kv('H-bond acceptors', D.hba ?? '–'), kv('Rotatable bonds', D.rotb ?? '–'),
-    kv('Aromatic rings', D.arom ?? '–'), kv('Fsp3', fx(D.fsp3, 2)), kv('Complexity', fx(D.cx, 0)),
+    kv('Aromatic rings', D.arom ?? '–'), kv('Fsp3', fx(D.fsp3, 2)), kv('Complexity', fx(D.cx, 0), 'PubChem'),
     kv('Rule-of-five violations', D.ro5 ?? '–'), kv('Formal charge', D.charge ?? '–'),
   ].join('');
   const a = d.act;
@@ -761,7 +796,7 @@ function initHansch() {
   sel.value = app.seriesId || app.hansch.groups[0].id;
   sel.addEventListener('change', renderHansch);
   $('#h-show').addEventListener('click', () => {
-    setView({ x: 'logp', y: 'act', z: 'mr', color: 'single', group: sel.value, l1: '', l2: '', l3: '', route: '', veber: false });
+    setView({ x: 'logp', y: 'act', z: 'mr', color: 'single', group: sel.value, l1: '', l2: '', l3: '', route: '', small: true, veber: false });
     camTo(STEPS.series.cam);
     if (narrow.matches) $('#stage').scrollIntoView({ behavior: reduceMotion.matches ? 'auto' : 'smooth' });
   });
@@ -805,13 +840,15 @@ function fillTourText() {
   const ex = M.pca.explained.map(v => (v * 100).toFixed(0) + '%');
   const top = k => Object.entries(M.pca.loadings).sort((a, b) => Math.abs(b[1][k]) - Math.abs(a[1][k])).slice(0, 2).map(e => pcaNames[e[0]] || e[0]).join(' and ');
   $('#t-pca').textContent = `PC1, PC2 and PC3 explain ${ex[0]}, ${ex[1]} and ${ex[2]} of the variance across ${D.filter(d => d.pc).length} drugs. PC1 is driven mostly by ${top(0)}, PC2 by ${top(1)}, PC3 by ${top(2)}. Colours mark the three largest ATC groups.`;
-  const lp = D.filter(d => fin(d.d.logp)), lpv = lp.map(d => d.d.logp);
+  $('#t-ts').textContent = structureMapText(D);
+  const lp = D.filter(d => fin(d.d.logp) && d.d.mw <= app.hansch.max_mw), lpv = lp.map(d => d.d.logp), nBig = D.length - lp.length;
   const lo = lp.reduce((a, b) => (b.d.logp < a.d.logp ? b : a)), hi = lp.reduce((a, b) => (b.d.logp > a.d.logp ? b : a));
   const over5 = lpv.filter(v => v > 5).length;
-  $('#t-logp').textContent = `log P runs from ${fx(lo.d.logp, 1)} (${cap(lo.name)}) to ${fx(hi.d.logp, 1)} (${cap(hi.name)}); the median is ${fx(median(lpv), 1)}. ${over5} of ${lp.length} drugs (${(100 * over5 / lp.length).toFixed(0)}%) are above 5, Lipinski's limit. Depth is random spread so the points do not overlap.`;
+  $('#t-logp').textContent = `Among the ${lp.length} drugs up to ${app.hansch.max_mw} Da, log P runs from ${fx(lo.d.logp, 1)} (${cap(lo.name)}) to ${fx(hi.d.logp, 1)} (${cap(hi.name)}); the median is ${fx(median(lpv), 1)}. ${over5} (${(100 * over5 / lp.length).toFixed(0)}%) are above 5, Lipinski's limit. The ${nBig} larger drugs, mostly peptides, are left out from here on: Crippen log P falls as low as ${fx(Math.min(...D.map(d => d.d.logp)), 0)} for them, and Hansch analysis is about small molecules. Depth is random spread so the points do not overlap.`;
   const both = D.filter(d => fin(d.d.logp) && fin(d.d.mr));
-  $('#t-mr').textContent = `Across ${both.length} drugs, Pearson r between log P and MR is ${fx(pearson(both.map(d => d.d.logp), both.map(d => d.d.mr)), 2)}.`;
-  const tp = D.filter(d => fin(d.d.tpsa) && d.routes.length), oral = tp.filter(d => d.routes.includes('ORAL')), non = tp.filter(d => !d.routes.includes('ORAL'));
+  const small = both.filter(d => d.d.mw <= 500), r = a => fx(pearson(a.map(d => d.d.logp), a.map(d => d.d.mr)), 2);
+  $('#t-mr').textContent = `Among the ${small.length} drugs up to 500 Da, Pearson r between log P and MR is ${r(small)}: larger small molecules tend to be greasier. Across all ${both.length} it is ${r(both)}, because peptides and other large polar drugs have a high MR and a very low log P.`;
+  const tp = lp.filter(d => fin(d.d.tpsa) && d.routes.length), oral = tp.filter(d => d.routes.includes('ORAL')), non = tp.filter(d => !d.routes.includes('ORAL'));
   const share = a => (100 * a.filter(d => d.d.tpsa <= 140).length / Math.max(1, a.length)).toFixed(0);
   $('#t-tpsa').textContent = `${share(oral)}% of the ${oral.length} drugs with an oral route sit at or below 140 Å², against ${share(non)}% of the ${non.length} drugs given only by other routes.`;
   const ac = D.filter(d => d.act).map(d => d.act.p);
@@ -830,11 +867,37 @@ function fillTourText() {
   $('#t-all-eq').innerHTML = `${esc(equation(all))}<br><b>${verdict(all)[0]}.</b> ${esc(verdict(all)[1])}`;
 }
 
+// How often a drug's nearest neighbour shares its ATC anatomical group: in the fingerprint map, in descriptor (PCA) space,
+// and by chance. Fingerprints see scaffolds; bulk descriptors do not, which is why Hansch analysis needs a congeneric series.
+function structureMapText(D) {
+  const pts = D.filter(d => d.ts && d.pc), L1 = pts.map(d => new Set(d.atc.map(e => e.code[0])));
+  const share = (i, j) => [...L1[i]].some(c => L1[j].has(c));
+  const nnShare = key => {
+    let hit = 0;
+    for (let i = 0; i < pts.length; i++) {
+      let best = -1, bd = Infinity;
+      for (let j = 0; j < pts.length; j++) {
+        if (j === i || pts[j].smiles === pts[i].smiles) continue;
+        let s = 0;
+        for (let k = 0; k < key(pts[i]).length; k++) { const t = key(pts[i])[k] - key(pts[j])[k]; s += t * t; }
+        if (s < bd) { bd = s; best = j; }
+      }
+      if (best >= 0 && share(i, best)) hit++;
+    }
+    return hit / pts.length;
+  };
+  let chance = 0;
+  for (let i = 0; i < pts.length; i++) { let c = 0; for (let j = 0; j < pts.length; j++) if (j !== i && share(i, j)) c++; chance += c / (pts.length - 1); }
+  chance /= pts.length;
+  const pct = v => (100 * v).toFixed(0) + '%';
+  return `In this map ${pct(nnShare(d => d.ts))} of ${pts.length} drugs have a nearest neighbour from the same ATC anatomical group, against ${pct(nnShare(d => d.pc))} in the descriptor space of step 1 and ${pct(chance)} by chance.`;
+}
+
 function fillMethod() {
   const D = app.drugs, M = app.meta, ms = D.filter(d => d.conf);
   const pcs = ms.filter(d => d.conf.startsWith('PubChem')).length;
   $('#m-count').textContent = D.length;
-  $('#m-checks').textContent = `${D.length} drugs; ${D.filter(d => d.title != null).length} with PubChem descriptors; ${pcs} PubChem 3D conformers and ${ms.length - pcs} RDKit conformers; ` +
+  $('#m-checks').textContent = `${D.length} drugs, all described by RDKit; ${D.filter(d => fin(d.d.xlogp)).length} with a PubChem XLogP3; ${pcs} PubChem 3D conformers and ${ms.length - pcs} RDKit conformers; ` +
     `${D.filter(d => d.act).length} with an activity value; ${app.hansch.groups.length - 1} target groups with at least ${app.hansch.min_group} drugs. Data built ${M.generated_utc.slice(0, 10)}.`;
 }
 
@@ -863,6 +926,8 @@ async function boot() {
     const gr = cands.find(g => g.id === 'CHEMBL2034' && g.q2 >= 0.3);
     app.seriesId = (gr || [...cands].filter(g => g.n >= 8).sort((a, b) => b.q2 - a.q2)[0] || cands[0])?.id ?? 'ALL';
     readTokens();
+    const head = $('.masthead');
+    new ResizeObserver(() => document.documentElement.style.setProperty('--stage-top', `${head.offsetHeight}px`)).observe(head);
     initStage();
     initControls();
     initHansch();
