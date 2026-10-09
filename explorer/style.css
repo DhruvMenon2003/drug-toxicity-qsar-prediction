@@ -63,7 +63,7 @@ a { color: var(--accent); }
 .jump a:hover { background: var(--grid); color: var(--ink); }
 
 .layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); }
-.stage { position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--head-h)); height: calc(100dvh - var(--head-h)); align-self: start; }
+.stage { position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--stage-top, var(--head-h))); height: calc(100dvh - var(--stage-top, var(--head-h))); align-self: start; }   /* --stage-top: the measured masthead, which wraps to two rows on phones */
 .stage-inner { position: relative; width: 100%; height: 100%; overflow: hidden; }
 #space { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
 #space:active { cursor: grabbing; }
@@ -73,14 +73,14 @@ a { color: var(--accent); }
 .sel-label { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--mark); white-space: nowrap; padding: 2px 6px; background: color-mix(in oklab, var(--bg) 82%, transparent); border-radius: 4px; text-transform: capitalize; }
 .ax-plane { font-family: var(--font-data); font-size: 11px; color: var(--mark); white-space: nowrap; }
 
-.hud { position: absolute; left: 16px; top: 14px; display: flex; flex-direction: column; gap: 8px; max-width: calc(100% - 32px); pointer-events: none; }
+.hud { position: absolute; left: 16px; top: 14px; display: flex; flex-direction: column; gap: 8px; max-width: calc(100% - 210px); pointer-events: none; }
 .axis-key { font-family: var(--font-data); font-size: 12px; color: var(--ink-2); display: flex; flex-direction: column; gap: 2px; }
 .axis-key b { color: var(--ink); font-weight: 500; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-family: var(--font-display); font-size: 13px; color: var(--ink-2); }
 .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
 .legend .ramp { display: inline-block; width: 90px; height: 8px; border-radius: 4px; margin: 0 6px; vertical-align: 0; background: linear-gradient(90deg, var(--q1), var(--q2), var(--q3), var(--q4), var(--q5)); }
 .stage-status { position: absolute; right: 16px; bottom: 54px; font-family: var(--font-data); font-size: 12px; color: var(--muted); }
-.stage-tools { position: absolute; right: 16px; bottom: 14px; display: flex; gap: 8px; }
+.stage-tools { position: absolute; right: 16px; top: 12px; display: flex; gap: 8px; }   /* top right: the axis titles land along the bottom edge */
 .tooltip {
   position: absolute; z-index: 5; pointer-events: none; max-width: 280px;
   background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px;
@@ -129,6 +129,7 @@ select, input[type="search"] { font: 400 0.95rem var(--font-display); color: var
 #mol { display: block; width: 100%; height: 280px; touch-action: none; }
 .mol-tools { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-top: 1px solid var(--line); font-family: var(--font-data); font-size: 0.75rem; color: var(--ink-2); }
 .check { display: inline-flex; gap: 6px; align-items: center; font-family: var(--font-display); font-size: 0.85rem; color: var(--ink); }
+.field label.check { text-transform: none; letter-spacing: 0; font-size: 0.85rem; color: var(--ink); min-height: 2.25rem; }
 .depict { display: flex; justify-content: center; }
 .depict svg { max-width: 100%; height: auto; }
 .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px 16px; margin: 0; }
@@ -178,6 +179,8 @@ details > summary h2 { display: inline; }
   .step { min-height: 52vh; padding-block: 8vh 6vh; }
   .step h2 { font-size: 1.5rem; }
   .hud .axis-key { display: none; }
+  .legend { font-size: 12px; gap: 2px 12px; }
+  .legend > span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* one line per group keeps the plot clear */
 }
 @media (prefers-reduced-motion: reduce) {
   .step { transition: none; }

@@ -1,20 +1,26 @@
 #!/usr/bin/env python3
 """Build the data files for the Hansch Space 3D explorer (explorer/index.html).
 
-Reads the curated table written by curation/colab_curate_all.py and adds PubChem data for every drug.
+Reads the curated table written by curation/colab_curate_all.py. RDKit computes every descriptor the fits use from the
+curated SMILES, so all drugs are described the same way; PubChem adds XLogP3, complexity and 3D conformers wherever it
+answers, and RDKit fills in when it does not.
 
 Colab:
-    !pip -q install rdkit
+    !pip -q install rdkit marimo-chem-utils
     !wget -q -O build_data.py https://raw.githubusercontent.com/DhruvMenon2003/drug-toxicity-qsar-prediction/main/explorer/build_data.py
     %run build_data.py --curated curated/drugbank_curated_dedup.csv --out explorer_data
 
 Local:
     python explorer/build_data.py --curated path/to/drugbank_curated_dedup.csv --out explorer/data
 
-Sources, in this order (APIs only, no scraping of drug pages):
-    PubChem PUG REST   parent CID by InChIKey, descriptors (XLogP3, TPSA, MW, H-bond counts, ...), 3D conformers
-    WHO ATC index      ATC level 1-3 names (the curated table's level-3 names were wrong before this fix)
-    RDKit              Crippen logP and molar refractivity, and a 3D conformer when PubChem has none
+Sources (APIs only, no scraping of drug pages):
+    RDKit               Crippen logP and molar refractivity, TPSA, weight, H-bond counts, rotatable bonds, aromatic rings,
+                        Fsp3 (the descriptors behind the PCA and the regressions), and a 3D conformer when PubChem has none
+    marimo-chem-utils   Morgan count fingerprints and a t-SNE structure map; InChIKey cross-check of the curated SMILES
+    PubChem PUG REST    parent CID, XLogP3, complexity and PubChem's descriptors as a cross-check, 3D conformers
+    WHO ATC index       ATC level 1-4 names (the curated table's level-3 names were wrong before this fix)
+
+--no-pubchem builds from RDKit alone (for when PubChem is down); a later run with PubChem fills its fields from the cache.
 
 Outputs (in --out):
     drugs.json       one record per drug: ATC codes and names, routes, descriptors, PCA scores, ChEMBL activity
@@ -26,11 +32,14 @@ Outputs (in --out):
 import argparse, csv, datetime as dt, hashlib, io, json, math, os, re, threading, time
 from concurrent.futures import ThreadPoolExecutor
 
+os.environ.setdefault("TQDM_DISABLE", "1")     # marimo-chem-utils shows progress bars; keep the build log readable
+
 import numpy as np
 import pandas as pd
 import requests
 from rdkit import Chem, RDLogger
-from rdkit.Chem import AllChem, Crippen, Descriptors, Lipinski, rdMolDescriptors
+from rdkit.Chem import AllChem, Crippen, Descriptors, rdMolDescriptors
+import marimo_chem_utils as mcu
 
 RDLogger.DisableLog("rdApp.*")
 PUG = "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
@@ -39,6 +48,7 @@ PROPS = ("XLogP,TPSA,MolecularWeight,HBondDonorCount,HBondAcceptorCount,Rotatabl
          "HeavyAtomCount,Complexity,Charge,MolecularFormula,Title,InChIKey")
 CID, NAME = "Compound Identifier", "Generic Name"
 MIN_GROUP = 5            # smallest ChEMBL-target group that gets a regression
+MAX_MW = 1000            # fits use small molecules only: Crippen logP of 4-7 kDa peptides (down to -43) would set every slope
 SEED = 20261009          # fixed seed: y-randomisation and RDKit embedding give the same answer on every run
 
 
@@ -48,7 +58,7 @@ class Http:
     PubChem reports this client's request budget in X-Throttling-Control; when it turns Red or Black, every thread pauses."""
 
     def __init__(self, cache_dir):
-        self.cache_dir, self.log, self.lock, self.last, self.pause_until, self.down = cache_dir, [], threading.Lock(), 0.0, 0.0, {}
+        self.cache_dir, self.log, self.lock, self.last, self.pause_until, self.down, self.offline = cache_dir, [], threading.Lock(), 0.0, 0.0, {}, {}
         os.makedirs(cache_dir, exist_ok=True)
         self.s = requests.Session()
         self.s.headers["User-Agent"] = "drug-toxicity-qsar-prediction explorer (research; github.com/DhruvMenon2003)"
@@ -63,7 +73,7 @@ class Http:
     def _throttle(self, r):
         """Back off from PubChem's own load report and Retry-After before the server starts refusing."""
         mine = re.findall(r"Request (?:Count|Time) status: (\w+)", r.headers.get("X-Throttling-Control", ""))
-        wait = float(r.headers.get("Retry-After", 0) or 0) if r.status_code in (429, 503) else 0
+        wait = min(30.0, float(r.headers.get("Retry-After", 0) or 0)) if r.status_code in (429, 503) else 0
         if "Black" in mine:                      # our own request budget; "Service status" is the server's overall load
             wait = max(wait, 30)
         elif "Red" in mine:
@@ -80,11 +90,11 @@ class Http:
             self.log.append({"url": url, "status": c["status"], "bytes": len(c["text"]), "utc": c["utc"], "cached": True})
             return c["status"], c["text"]
         host = url.split("/")[2]
-        if self.down.get(host, 0) >= 3:      # three requests in a row ran out of retries: stop hammering a server that is down
+        if self.offline.get(host) or self.down.get(host, 0) >= 2:   # two requests in a row ran out of retries: stop hammering
             self.log.append({"url": url, "status": None, "bytes": 0, "utc": "", "cached": False})
-            return None, "skipped: host unavailable during this run"
+            return None, "skipped: host unavailable or turned off for this run"
         status, text = None, ""
-        for attempt in range(6):
+        for attempt in range(4):
             self._wait()
             try:
                 r = self.s.get(url, timeout=120)
@@ -127,10 +137,14 @@ def first_target(text):
 
 # ---------------------------------------------------------------- RDKit
 def rdkit_descriptors(mol):
-    return {"clogp": Crippen.MolLogP(mol), "mr": Crippen.MolMR(mol), "tpsa_rd": rdMolDescriptors.CalcTPSA(mol),
-            "mw_rd": Descriptors.MolWt(mol), "hbd_rd": Lipinski.NumHDonors(mol), "hba_rd": Lipinski.NumHAcceptors(mol),
-            "rotb_rd": rdMolDescriptors.CalcNumRotatableBonds(mol), "arom": rdMolDescriptors.CalcNumAromaticRings(mol),
-            "fsp3": rdMolDescriptors.CalcFractionCSP3(mol), "heavy_rd": mol.GetNumHeavyAtoms()}
+    """Every descriptor the PCA and the regressions use, computed the same way for every drug from the curated SMILES.
+    H-bond counts are Lipinski's own definitions (NH + OH donors, N + O acceptors), as in the rule of five.
+    TPSA is Ertl's N and O polar surface (RDKit default), the definition behind Veber's 140 A^2 limit."""
+    return {"logp": Crippen.MolLogP(mol), "mr": Crippen.MolMR(mol), "tpsa": rdMolDescriptors.CalcTPSA(mol),
+            "mw": Descriptors.MolWt(mol), "hbd": rdMolDescriptors.CalcNumLipinskiHBD(mol), "hba": rdMolDescriptors.CalcNumLipinskiHBA(mol),
+            "rotb": rdMolDescriptors.CalcNumRotatableBonds(mol), "arom": rdMolDescriptors.CalcNumAromaticRings(mol),
+            "fsp3": rdMolDescriptors.CalcFractionCSP3(mol), "heavy": mol.GetNumHeavyAtoms(),
+            "formula": rdMolDescriptors.CalcMolFormula(mol), "charge": Chem.GetFormalCharge(mol)}
 
 
 def embed_3d(smiles):
@@ -177,7 +191,8 @@ def ols(X, y):
     dof = len(y) - A.shape[1]
     s2 = float(((y - fit) ** 2).sum() / dof) if dof > 0 else float("nan")
     try:
-        se = np.sqrt(np.diag(s2 * np.linalg.inv(A.T @ A)))
+        with np.errstate(invalid="ignore"):          # near-collinear candidate (e.g. logP with logP^2): se is NaN, written as null
+            se = np.sqrt(np.diag(s2 * np.linalg.inv(A.T @ A)))
     except np.linalg.LinAlgError:
         se = np.full(A.shape[1], np.nan)
     return coef, se, fit, math.sqrt(s2) if dof > 0 else float("nan")
@@ -247,9 +262,12 @@ def main():
     ap.add_argument("--out", default="explorer/data")
     ap.add_argument("--cache", default=".pubchem_cache")
     ap.add_argument("--fix-curated-l3", action="store_true", help="write the corrected ATC_L3_name back into --curated")
+    ap.add_argument("--no-pubchem", action="store_true", help="RDKit only: use cached PubChem answers but make no new PubChem requests")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     http = Http(a.cache)
+    if a.no_pubchem:
+        http.offline["pubchem.ncbi.nlm.nih.gov"] = True
     started = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
     df = pd.read_csv(a.curated, dtype={CID: str, "ATC": str})
     print(f"curated rows {len(df)}, drugs {df[CID].nunique()}, ATC codes {df.ATC.nunique()}")
@@ -351,29 +369,36 @@ def main():
         d["conf"] = m["src"] if m else None
     print(f"3D conformers: PubChem {sum(1 for m in molecules.values() if m['src'].startswith('PubChem'))}, RDKit {n_rd}, none {len(drugs) - len(molecules)}")
 
-    # ---- descriptors (PubChem first, RDKit for Crippen logP/MR and as a cross-check)
+    # ---- descriptors: RDKit for every drug (one consistent method); PubChem adds XLogP3 and complexity where it answered,
+    # and its weight and TPSA are kept (underscored, not written out) as a cross-check of the parent CID
     for d in drugs.values():
         mol = Chem.MolFromSmiles(d["smiles"]) if isinstance(d["smiles"], str) else None
-        rd = rdkit_descriptors(mol) if mol else {}
+        desc = rdkit_descriptors(mol) if mol else {}
         p = props.get(d["pcid"], {})
-        xl = p.get("XLogP")
-        desc = {"logp": xl if xl is not None else rd.get("clogp"), "logp_src": "XLogP3 (PubChem)" if xl is not None else "Crippen (RDKit)",
-                "xlogp": xl, "clogp": rd.get("clogp"), "mr": rd.get("mr"),
-                "tpsa": p.get("TPSA", rd.get("tpsa_rd")), "mw": float(p["MolecularWeight"]) if "MolecularWeight" in p else rd.get("mw_rd"),
-                "hbd": p.get("HBondDonorCount", rd.get("hbd_rd")), "hba": p.get("HBondAcceptorCount", rd.get("hba_rd")),
-                "rotb": p.get("RotatableBondCount", rd.get("rotb_rd")), "heavy": p.get("HeavyAtomCount", rd.get("heavy_rd")),
-                "cx": p.get("Complexity"), "charge": p.get("Charge"), "arom": rd.get("arom"), "fsp3": rd.get("fsp3"),
-                "formula": p.get("MolecularFormula"), "_mw_rd": rd.get("mw_rd"), "_tpsa_rd": rd.get("tpsa_rd"), "_heavy_rd": rd.get("heavy_rd")}
-        if desc["logp"] is not None:
-            desc["ro5"] = int((desc["mw"] or 0) > 500) + int(desc["logp"] > 5) + int((desc["hbd"] or 0) > 5) + int((desc["hba"] or 0) > 10)
+        desc.update(xlogp=p.get("XLogP"), cx=p.get("Complexity"),
+                    _pc_mw=float(p["MolecularWeight"]) if "MolecularWeight" in p else None, _pc_tpsa=p.get("TPSA"))
+        if desc.get("logp") is not None:
+            desc["ro5"] = int(desc["mw"] > 500) + int(desc["logp"] > 5) + int(desc["hbd"] > 5) + int(desc["hba"] > 10)
         d["title"] = p.get("Title")
-        d["desc_src"] = "PubChem" if p else "RDKit (no PubChem record in this build)"
+        d["pubchem"] = bool(p)
+        d["ik_ok"] = mcu.smi2inchi_key(d["smiles"]) == d["ik"] if mol else False
         d["d"] = desc
+    print(f"RDKit descriptors {sum('logp' in d['d'] for d in drugs.values())}/{len(drugs)}, "
+          f"PubChem XLogP3 {sum(d['d'].get('xlogp') is not None for d in drugs.values())}")
+
+    # ---- structure map (marimo-chem-utils): Morgan count fingerprints (radius 3, 2048 bits) -> PCA 50 -> t-SNE 2D
+    fp = pd.DataFrame([{"cid": d["cid"], "SMILES": d["smiles"]} for d in drugs.values() if d["d"].get("logp") is not None])
+    fp = mcu.add_tsne_columns(mcu.add_fingerprint_column(fp, "np_count_fp", "np_counts_fp", "SMILES"), "SMILES", "np_count_fp")
+    by_cid = {d["cid"]: d for d in drugs.values()}
+    for cid, x, y in fp[["cid", "TSNE_x", "TSNE_y"]].itertuples(index=False):
+        by_cid[cid]["ts"] = [round(float(x), 2), round(float(y), 2)]
+    print(f"t-SNE structure map: {len(fp)} drugs")
 
     # ---- PCA on standardised descriptors (drugs with all of them)
     feats = ["logp", "mr", "tpsa", "mw", "hbd", "hba", "rotb", "arom", "fsp3"]
+    logged = ["mr", "tpsa", "mw", "hbd", "hba", "rotb", "arom"]   # heavy-tailed sizes and counts on log1p, so a few peptides do not set the scale
     ok = [d for d in drugs.values() if all(d["d"].get(f) is not None for f in feats)]
-    X = np.array([[d["d"][f] for f in feats] for d in ok], float)
+    X = np.array([[math.log1p(d["d"][f]) if f in logged else d["d"][f] for f in feats] for d in ok], float)
     mu, sd = X.mean(0), X.std(0)
     U, S, Vt = np.linalg.svd((X - mu) / sd, full_matrices=False)
     scores = U[:, :3] * S[:3]
@@ -385,7 +410,7 @@ def main():
     rng = np.random.default_rng(SEED)
     act_rows, seen = [], set()
     for d in drugs.values():
-        if d["act"] and d["d"].get("logp") is not None and d["d"].get("mr") is not None and d["ik"] not in seen:
+        if d["act"] and d["d"].get("logp") is not None and d["d"]["mw"] <= MAX_MW and d["ik"] not in seen:
             seen.add(d["ik"])
             act_rows.append({"cid": d["cid"], "p": d["act"]["p"], "target": d["act"]["target"], "tname": d["act"]["tname"],
                              "logp": d["d"]["logp"], "mr": d["d"]["mr"], "tpsa": d["d"]["tpsa"]})
@@ -407,40 +432,44 @@ def main():
         dd = {k: clean(v) for k, v in d["d"].items() if not k.startswith("_")}
         out_drugs.append({**{k: v for k, v in d.items() if k not in ("d",)}, "d": dd})
     meta = {"generated_utc": started, "n_drugs": len(out_drugs), "atc_names": names,
-            "pca": {"features": feats, "explained": [round(float(v), 4) for v in explained],
+            "pca": {"features": feats, "log1p": logged, "explained": [round(float(v), 4) for v in explained],
                     "loadings": {f: [round(float(v), 3) for v in Vt[:3, i]] for i, f in enumerate(feats)}},
             "sources": {"pubchem": PUG, "who_atc": "https://atcddd.fhi.no/atc_ddd_index/", "curated": os.path.basename(a.curated)}}
     json.dump({"meta": meta, "drugs": out_drugs}, open(os.path.join(a.out, "drugs.json"), "w"), separators=(",", ":"))
     json.dump(molecules, open(os.path.join(a.out, "molecules.json"), "w"), separators=(",", ":"))
-    json.dump({"min_group": MIN_GROUP, "seed": SEED, "groups": [overall, *groups]}, open(os.path.join(a.out, "hansch.json"), "w"), separators=(",", ":"))
+    json.dump({"min_group": MIN_GROUP, "max_mw": MAX_MW, "seed": SEED, "groups": [overall, *groups]}, open(os.path.join(a.out, "hansch.json"), "w"), separators=(",", ":"))
     with open(os.path.join(a.out, "provenance.csv"), "w", newline="") as f:
         w = csv.DictWriter(f, ["url", "status", "bytes", "utc", "cached"])
         w.writeheader()
         w.writerows(http.log)
-    write_validation(a, drugs, molecules, groups, overall, names, l3s, missing_l3, http.log, explained, feats, started)
+    write_validation(a, drugs, molecules, groups, overall, names, l3s, missing_l3, http.log, explained, feats, logged, started)
     print("done:", ", ".join(sorted(os.listdir(a.out))))
 
 
-def write_validation(a, drugs, molecules, groups, overall, names, l3s, missing_l3, log, explained, feats, started):
+def write_validation(a, drugs, molecules, groups, overall, names, l3s, missing_l3, log, explained, feats, logged, started):
     D = list(drugs.values())
     pair = lambda k1, k2: np.array([(d["d"][k1], d["d"][k2]) for d in D if d["d"].get(k1) is not None and d["d"].get(k2) is not None], float)
-    xl = pair("xlogp", "clogp")
-    mw = pair("mw", "_mw_rd")
-    tp = pair("tpsa", "_tpsa_rd")
-    worst_logp = sorted((d for d in D if d["d"].get("xlogp") is not None and d["d"].get("clogp") is not None),
-                        key=lambda d: -abs(d["d"]["xlogp"] - d["d"]["clogp"]))[:8]
-    mw_bad = [d for d in D if d["d"].get("mw") is not None and d["d"].get("_mw_rd") is not None and abs(d["d"]["mw"] - d["d"]["_mw_rd"]) > 0.5]
+    xl = pair("xlogp", "logp")
+    mw = pair("_pc_mw", "mw")
+    tp = pair("_pc_tpsa", "tpsa")
+    stat = lambda a, f: f(a) if len(a) > 1 else float("nan")
+    worst_logp = sorted((d for d in D if d["d"].get("xlogp") is not None and d["d"].get("logp") is not None),
+                        key=lambda d: -abs(d["d"]["xlogp"] - d["d"]["logp"]))[:8]
+    mw_bad = [d for d in D if d["d"].get("_pc_mw") is not None and d["d"].get("mw") is not None and abs(d["d"]["_pc_mw"] - d["d"]["mw"]) > 0.5]
     heavy_bad = []
     for d in D:
         m = molecules.get(str(d["cid"]))
-        if m and d["d"].get("_heavy_rd") is not None and sum(z > 1 for z in m["z"]) != d["d"]["_heavy_rd"]:
+        if m and d["d"].get("heavy") is not None and sum(z > 1 for z in m["z"]) != d["d"]["heavy"]:
             heavy_bad.append(d)
     hosts = pd.DataFrame(log).assign(host=lambda t: t.url.str.extract(r"https?://([^/]+)")[0]).groupby(["host", "status", "cached"]).size()
-    L = [f"# Hansch Space data checks", "", f"Built {started} from `{os.path.basename(a.curated)}`.", "",
+    L = ["# Hansch Space data checks", "", f"Built {started} from `{os.path.basename(a.curated)}`.", "",
          "## Counts", "",
          f"- Drugs (dataset CIDs): {len(D)}",
          f"- Parent CID differs from the dataset CID (salt or mixture record in the source): {sum(d['pcid'] != d['cid'] for d in D)}",
-         f"- PubChem descriptors found: {sum(d['desc_src'] == 'PubChem' for d in D)} (the rest use RDKit values from the curated SMILES)",
+         f"- RDKit descriptors (used for the PCA and every fit): {sum(d['d'].get('logp') is not None for d in D)}",
+         f"- Curated InChIKey reproduced from the curated SMILES (marimo-chem-utils smi2inchi_key): {sum(d['ik_ok'] for d in D)}/{len(D)}",
+         f"- t-SNE structure-map coordinates: {sum('ts' in d for d in D)}",
+         f"- PubChem records found (XLogP3, complexity, cross-checks): {sum(d['pubchem'] for d in D)}; with XLogP3: {sum(d['d'].get('xlogp') is not None for d in D)}",
          f"- PubChem requests that failed after retries or were skipped while PubChem was down: "
          f"{sum(1 for r in log if 'pubchem' in r['url'] and r['status'] not in (200, 404))} (rerun the build to fill them from PubChem)",
          f"- 3D conformers from PubChem: {sum(1 for m in molecules.values() if m['src'].startswith('PubChem'))}; "
@@ -448,21 +477,25 @@ def write_validation(a, drugs, molecules, groups, overall, names, l3s, missing_l
          f"- Drugs with a ChEMBL activity value: {sum(d['act'] is not None for d in D)}",
          f"- ATC level-3 names found: {len(l3s) - len(missing_l3)}/{len(l3s)}" + (f" (missing: {', '.join(missing_l3)})" if missing_l3 else ""),
          "", "## Cross-checks (PubChem against RDKit on the curated SMILES)", "",
-         f"- Molecular weight: {len(mw)} pairs, max difference {np.abs(mw[:, 0] - mw[:, 1]).max():.2f} Da; "
+         f"- Molecular weight: {len(mw)} pairs, max difference {stat(mw, lambda a: np.abs(a[:, 0] - a[:, 1]).max()):.2f} Da; "
          f"{len(mw_bad)} drugs differ by more than 0.5 Da (would mean the parent CID is the wrong record).",
-         f"- TPSA: {len(tp)} pairs, Pearson r {np.corrcoef(tp.T)[0, 1]:.3f}, mean absolute difference {np.abs(tp[:, 0] - tp[:, 1]).mean():.2f} A^2 "
-         "(PubChem counts S and P polar surface; RDKit's default does not).",
-         f"- logP: XLogP3 against Crippen, {len(xl)} pairs, Pearson r {np.corrcoef(xl.T)[0, 1]:.3f}, "
-         f"mean absolute difference {np.abs(xl[:, 0] - xl[:, 1]).mean():.2f}. Two different logP models; large gaps are listed below.",
+         f"- TPSA: {len(tp)} pairs, Pearson r {stat(tp, lambda a: np.corrcoef(a.T)[0, 1]):.3f}, "
+         f"mean absolute difference {stat(tp, lambda a: np.abs(a[:, 0] - a[:, 1]).mean()):.2f} A^2 "
+         "(PubChem counts S and P polar surface; RDKit's default, used here, does not).",
+         f"- logP: XLogP3 against Crippen, {len(xl)} pairs, Pearson r {stat(xl, lambda a: np.corrcoef(a.T)[0, 1]):.3f}, "
+         f"mean absolute difference {stat(xl, lambda a: np.abs(a[:, 0] - a[:, 1]).mean()):.2f}. Two different logP models; "
+         "the fits use Crippen for every drug, and the largest gaps are listed below.",
          f"- 3D conformer heavy-atom count equals the curated SMILES: {len(molecules) - len(heavy_bad)}/{len(molecules)}"
          + (f"; mismatches: {', '.join(d['name'] for d in heavy_bad[:15])}" if heavy_bad else ""), ""]
     if mw_bad:
-        L += ["Molecular weight mismatches: " + ", ".join(f"{d['name']} ({d['d']['mw']:.1f} vs {d['d']['_mw_rd']:.1f})" for d in mw_bad[:20]), ""]
+        L += ["Molecular weight mismatches (PubChem vs RDKit): " + ", ".join(f"{d['name']} ({d['d']['_pc_mw']:.1f} vs {d['d']['mw']:.1f})" for d in mw_bad[:20]), ""]
     L += ["Largest XLogP3 vs Crippen gaps:", "", "| Drug | XLogP3 | Crippen |", "|---|---|---|"]
-    L += [f"| {d['name']} | {d['d']['xlogp']:.2f} | {d['d']['clogp']:.2f} |" for d in worst_logp]
-    L += ["", f"PCA on standardised {', '.join(feats)}: PC1-3 explain " + ", ".join(f"{v:.1%}" for v in explained) + ".", "",
+    L += [f"| {d['name']} | {d['d']['xlogp']:.2f} | {d['d']['logp']:.2f} |" for d in worst_logp]
+    L += ["", f"PCA on standardised {', '.join(feats)} ({', '.join(logged)} as log(1 + x)): PC1-3 explain " + ", ".join(f"{v:.1%}" for v in explained) + ".", "",
           "## Hansch-type fits", "",
           "Activity is the median ChEMBL pChEMBL at the drug's mechanism target(s). Drugs are grouped by their first listed target. "
+          f"Only drugs up to {MAX_MW} Da are fitted ({sum(1 for d in D if d['act'] and d['d'].get('mw', 0) > MAX_MW)} larger drugs with an activity value, "
+          "mostly peptides, are left out: Crippen logP reaches -43 for them and would set every slope). "
           "These groups are not congeneric series, so the fits are exploratory. A fit is credible only when q2 is well above 0 and "
           "the shuffled-activity r2 (y-randomisation, 100 runs) stays far below the real r2.", "",
           "| Group | n | Model | r2 | q2 (LOO) | s | shuffled r2 mean / max |", "|---|---|---|---|---|---|---|"]

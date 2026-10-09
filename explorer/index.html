@@ -24,7 +24,7 @@
   <header class="masthead">
     <div class="brand">
       <h1>Drug Hansch Space</h1>
-      <p class="sub"><span id="m-count">759</span> approved drugs from the curated DrugBank set, placed by PubChem descriptors</p>
+      <p class="sub"><span id="m-count">759</span> approved drugs from the curated DrugBank set, placed by RDKit descriptors with PubChem enrichment</p>
     </div>
     <nav class="jump" aria-label="Sections">
       <a href="#tour">Tour</a>
@@ -44,7 +44,7 @@
           <div class="legend" id="legend"></div>
         </div>
         <div class="tooltip" id="tooltip" role="status" hidden></div>
-        <div class="stage-status" id="stage-status">Loading PubChem data…</div>
+        <div class="stage-status" id="stage-status">Loading data…</div>
         <div class="stage-tools">
           <button type="button" id="btn-reset" class="ghost" title="Reset the camera">Reset view</button>
           <button type="button" id="btn-spin" class="ghost" aria-pressed="false" title="Turn the scene slowly">Spin</button>
@@ -55,44 +55,52 @@
     <main class="rail">
       <section id="tour" class="tour" aria-label="Guided tour">
         <article class="step" data-step="space">
-          <p class="eyebrow">Step 1 of 7 · Chemical space</p>
+          <p class="eyebrow">Step 1 of 8 · Chemical space</p>
           <h2>Every sphere is one drug</h2>
-          <p>Each point is a drug from the curated DrugBank table (one point per PubChem compound, salts removed). Its position comes from a principal component analysis of nine PubChem and RDKit descriptors, so drugs with similar size, polarity and lipophilicity sit close together.</p>
+          <p>Each point is a drug from the curated DrugBank table (one point per PubChem compound, salts removed). Its position comes from a principal component analysis of nine RDKit descriptors computed from the curated SMILES (sizes and counts on a log scale, so a few large peptides do not flatten the rest), so drugs with similar size, polarity and lipophilicity sit close together.</p>
           <p class="fig" id="t-pca"></p>
           <p class="hint">Drag to turn the space, pinch or Ctrl + scroll to zoom, and hover or tap a sphere to name it.</p>
         </article>
 
+        <article class="step" data-step="structure">
+          <p class="eyebrow">Step 2 of 8 · Structure</p>
+          <h2>A map of shared scaffolds</h2>
+          <p>The same drugs, now placed by structure rather than by properties. Each drug's Morgan count fingerprint (radius 3, 2048 bits, from marimo-chem-utils) is reduced to two dimensions with t-SNE, so drugs built on the same scaffold land next to each other. Distances between distant clusters mean little in t-SNE; only the neighbourhoods do.</p>
+          <p class="fig" id="t-ts"></p>
+          <p>A Hansch equation compares drugs that share a scaffold and differ by substituents. Neighbours on this map are the closest thing this set has to such a series.</p>
+        </article>
+
         <article class="step" data-step="logp">
-          <p class="eyebrow">Step 2 of 7 · Hydrophobicity</p>
+          <p class="eyebrow">Step 3 of 8 · Hydrophobicity</p>
           <h2>log P, the π term</h2>
           <p>Hansch and Fujita (1964) wrote biological activity as a function of hydrophobicity, electronic effects and size: <span class="eq">log 1/C = −k π² + k′ π + ρ σ + k″</span>. A drug has to partition into membranes to reach its target, so potency often rises with log P and then falls again once the molecule is too greasy to leave the membrane.</p>
-          <p>The points now spread along one axis only: PubChem XLogP3.</p>
+          <p>The points now spread along one axis only: Crippen log P, computed by RDKit the same way for every drug. PubChem's XLogP3 is shown beside it in the drug panel and as an axis in Explore.</p>
           <p class="fig" id="t-logp"></p>
         </article>
 
         <article class="step" data-step="mr">
-          <p class="eyebrow">Step 3 of 7 · Size</p>
+          <p class="eyebrow">Step 4 of 8 · Size</p>
           <h2>Molar refractivity, the steric term</h2>
-          <p>Molar refractivity (MR, cm³/mol) tracks molecular volume and polarisability. In Hansch equations it stands in for the bulk that has to fit the binding site. Seen from above, log P and MR are only loosely related: big molecules are not automatically greasy.</p>
+          <p>Molar refractivity (MR, cm³/mol) tracks molecular volume and polarisability. In Hansch equations it stands in for the bulk that has to fit the binding site. Seen from above, how log P and MR relate depends on size, which is why a Hansch equation keeps them as separate terms.</p>
           <p class="fig" id="t-mr"></p>
         </article>
 
         <article class="step" data-step="tpsa">
-          <p class="eyebrow">Step 4 of 7 · Polarity</p>
+          <p class="eyebrow">Step 5 of 8 · Polarity</p>
           <h2>Polar surface area and the oral route</h2>
           <p>Topological polar surface area (TPSA, Å²) adds the third axis. It is a whole-molecule stand-in for hydrogen bonding, not a Hammett σ. Veber et al. (2002) found that oral absorption drops above 140 Å², drawn here as a plane. Blue spheres are drugs with an oral route in the curated table.</p>
           <p class="fig" id="t-tpsa"></p>
         </article>
 
         <article class="step" data-step="activity">
-          <p class="eyebrow">Step 5 of 7 · Activity</p>
+          <p class="eyebrow">Step 6 of 8 · Activity</p>
           <h2>Potency at the mechanism target</h2>
           <p>The vertical axis now shows activity: the median ChEMBL pChEMBL value (−log₁₀ molar IC50, Ki, EC50 or Kd) at the drug's mechanism target, kept only when at least two publications agree. Drugs without a value leave the scene.</p>
           <p class="fig" id="t-act"></p>
         </article>
 
         <article class="step" data-step="series">
-          <p class="eyebrow">Step 6 of 7 · One target</p>
+          <p class="eyebrow">Step 7 of 8 · One target</p>
           <h2 id="t-series-h">A series that shares a target</h2>
           <p id="t-series"></p>
           <p class="fig eq-block" id="t-series-eq"></p>
@@ -100,7 +108,7 @@
         </article>
 
         <article class="step" data-step="all">
-          <p class="eyebrow">Step 7 of 7 · Many targets</p>
+          <p class="eyebrow">Step 8 of 8 · Many targets</p>
           <h2>Mixing targets breaks the model</h2>
           <p id="t-all"></p>
           <p class="fig eq-block" id="t-all-eq"></p>
@@ -129,6 +137,7 @@
           <div class="field"><label for="f-l2">ATC level 2</label><select id="f-l2"><option value="">All</option></select></div>
           <div class="field"><label for="f-l3">ATC level 3</label><select id="f-l3"><option value="">All</option></select></div>
           <div class="field"><label for="f-route">Route</label><select id="f-route"><option value="">All routes</option></select></div>
+          <div class="field"><span class="label">Size</span><label class="check"><input type="checkbox" id="f-small"> Only drugs up to 1000 Da, as in the fits</label></div>
           <div class="field wide"><label for="search">Find a drug</label>
             <input id="search" type="search" list="drug-names" placeholder="e.g. dexamethasone" autocomplete="off">
             <datalist id="drug-names"></datalist>
@@ -163,7 +172,7 @@
 
       <section id="hansch" class="panel" aria-labelledby="hansch-h">
         <h2 id="hansch-h">Hansch fits</h2>
-        <p class="lede">Drugs are grouped by their first ChEMBL mechanism target. A group with at least five drugs gets the regression with the best leave-one-out q², allowing one descriptor per five drugs.</p>
+        <p class="lede">Drugs are grouped by their first ChEMBL mechanism target. Drugs up to 1000 Da are fitted. A group with at least five drugs gets the regression with the best leave-one-out q², allowing one descriptor per five drugs.</p>
         <div class="field wide"><label for="h-group">Target group</label><select id="h-group"></select></div>
         <div id="h-out"></div>
         <figure class="obs-pred">
@@ -186,10 +195,11 @@
         <h2 id="method-h">Method and checks</h2>
         <ul>
           <li><strong>Drugs.</strong> One point per PubChem compound in <code>drugbank_curated_dedup.csv</code> (curation/colab_curate_all.py). The curated SMILES is the neutral parent; its InChIKey finds the parent CID in PubChem.</li>
-          <li><strong>Descriptors.</strong> PubChem PUG REST: XLogP3, TPSA, molecular weight, H-bond donors and acceptors, rotatable bonds, complexity. RDKit on the curated SMILES: Crippen log P and molar refractivity, aromatic rings, Fsp3.</li>
+          <li><strong>Descriptors.</strong> RDKit on the curated SMILES for every drug, so all drugs are described the same way: Crippen log P and molar refractivity, TPSA (Ertl, N and O), molecular weight, Lipinski H-bond donors (NH + OH) and acceptors (N + O), rotatable bonds, aromatic rings, Fsp3. These drive the PCA and every regression. PubChem PUG REST adds XLogP3 and complexity where it has the parent record, and its weight and TPSA are a cross-check.</li>
+          <li><strong>Structure map.</strong> marimo-chem-utils: Morgan count fingerprints (radius 3, 2048 bits), PCA to 50 components, then t-SNE (seed 42). The same library checks that each curated SMILES gives back its curated InChIKey. <code>explorer/hansch_marimo.py</code> is a marimo notebook over the same data.</li>
           <li><strong>3D conformers.</strong> PubChem's first 3D conformer where one exists; otherwise RDKit ETKDGv3 with an MMFF clean-up, labelled as such.</li>
           <li><strong>Activity.</strong> Median ChEMBL pChEMBL at the mechanism target, needing two or more documents. Toxicity is still empty in the source table.</li>
-          <li><strong>Regressions.</strong> Ordinary least squares on log P, log P², MR and TPSA. Model choice by leave-one-out q²; chance correlation checked by refitting on 100 shuffled activity vectors.</li>
+          <li><strong>Regressions.</strong> Ordinary least squares on log P, log P², MR and TPSA, for drugs up to 1000 Da (Crippen log P of large peptides reaches −43 and would set every slope). Model choice by leave-one-out q²; chance correlation checked by refitting on 100 shuffled activity vectors.</li>
         </ul>
         <p id="m-checks" class="checks"></p>
         <p class="small">Rebuild the data with <code>python explorer/build_data.py</code>. Every PubChem and WHO request it makes is listed in <code>explorer/data/provenance.csv</code>, and the cross-checks are in <code>explorer/data/validation.md</code>.</p>
