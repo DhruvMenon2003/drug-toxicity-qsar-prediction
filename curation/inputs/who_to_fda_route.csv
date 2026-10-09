@@ -1,0 +1,20 @@
+who_admr,fda_route,confidence,note
+O,ORAL,exact,
+SL,SUBLINGUAL,exact,
+R,RECTAL,exact,
+N,NASAL,exact,
+TD,TRANSDERMAL,exact,
+TD patch,TRANSDERMAL,exact,
+V,VAGINAL,exact,
+Inhal,RESPIRATORY (INHALATION),exact,
+Inhal.powder,RESPIRATORY (INHALATION),exact,dosage form kept in WHO code only
+Inhal.solution,RESPIRATORY (INHALATION),exact,dosage form kept in WHO code only
+Inhal.aerosol,RESPIRATORY (INHALATION),exact,dosage form kept in WHO code only
+urethral,URETHRAL,exact,
+s.c. implant,SUBCUTANEOUS,exact,
+P,PARENTERAL,coarse,"WHO P covers IV, IM, SC and others; refine per drug from its labels"
+implant,PARENTERAL,coarse,FDA defines PARENTERAL as injection infusion or implantation; site not given
+ointment,TOPICAL,check,"WHO uses it for one drug; may be OPHTHALMIC if an eye ointment"
+lamella,OPHTHALMIC,check,"WHO lamella = eye insert (pilocarpine); FDA could also be INTRAOCULAR"
+oral aerosol,ORAL,check,"could be SUBLINGUAL or OROPHARYNGEAL depending on the product"
+Chewing gum,ORAL,check,"nicotine gum labels may use BUCCAL"
