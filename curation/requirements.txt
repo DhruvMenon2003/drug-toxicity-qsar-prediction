@@ -7,3 +7,6 @@ pandas>=2.0
 openpyxl>=3.1
 rdkit>=2023.9
 pytest>=8
+# admr_fill_one_drug.ipynb
+lxml>=5
+matplotlib>=3.8
