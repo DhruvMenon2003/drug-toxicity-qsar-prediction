@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1344" height="906" viewBox="-20 -80 1344 906" font-family="Inter, system-ui, sans-serif">
+<defs><marker id="head" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#868e96"/></marker></defs>
+<rect x="-20" y="-80" width="100%" height="100%" fill="#ffffff"/>
+<text x="0" y="-40" font-size="20" font-weight="600" fill="#212529">Sources</text>
+<rect x="0" y="0" width="250" height="92" rx="10" fill="#e7f5ff" stroke="#1971c2"/>
+<text x="14" y="26" font-size="15" font-weight="600" fill="#212529">PubChem</text>
+<text x="14" y="48" font-size="11.5" fill="#495057">CID, isomeric SMILES, XLogP3,</text>
+<text x="14" y="63" font-size="11.5" fill="#495057">PK statements (PUG REST + PUG View)</text>
+<rect x="0" y="136" width="250" height="92" rx="10" fill="#e7f5ff" stroke="#1971c2"/>
+<text x="14" y="162" font-size="15" font-weight="600" fill="#212529">ChEMBL</text>
+<text x="14" y="184" font-size="11.5" fill="#495057">pChEMBL at the H2 receptor,</text>
+<text x="14" y="199" font-size="11.5" fill="#495057">strongest off-target, molecule properties</text>
+<rect x="0" y="272" width="250" height="92" rx="10" fill="#e7f5ff" stroke="#1971c2"/>
+<text x="14" y="298" font-size="15" font-weight="600" fill="#212529">openFDA + DailyMed</text>
+<text x="14" y="320" font-size="11.5" fill="#495057">label routes, dose and interval,</text>
+<text x="14" y="335" font-size="11.5" fill="#495057">FAERS reporting signal</text>
+<rect x="0" y="408" width="250" height="92" rx="10" fill="#e7f5ff" stroke="#1971c2"/>
+<text x="14" y="434" font-size="15" font-weight="600" fill="#212529">WHO ATC/DDD</text>
+<text x="14" y="456" font-size="11.5" fill="#495057">A02BA codes, defined daily dose,</text>
+<text x="14" y="471" font-size="11.5" fill="#495057">route where no US label exists</text>
+<rect x="0" y="544" width="250" height="92" rx="10" fill="#e7f5ff" stroke="#1971c2"/>
+<text x="14" y="570" font-size="15" font-weight="600" fill="#212529">TDC LD50_Zhu</text>
+<text x="14" y="592" font-size="11.5" fill="#495057">acute oral rat LD50</text>
+<text x="14" y="607" font-size="11.5" fill="#495057">(ChemIDplus/RTECS origin)</text>
+<rect x="0" y="680" width="250" height="92" rx="10" fill="#e7f5ff" stroke="#1971c2"/>
+<text x="14" y="706" font-size="15" font-weight="600" fill="#212529">RCSB PDB 7UL3</text>
+<text x="14" y="728" font-size="11.5" fill="#495057">inactive human H2 receptor</text>
+<text x="14" y="743" font-size="11.5" fill="#495057">with famotidine bound</text>
+<path d="M262 150 L322 150" stroke="#868e96" stroke-width="1.5" marker-end="url(#head)"/>
+<text x="336" y="-40" font-size="20" font-weight="600" fill="#212529">Pipeline</text>
+<rect x="336" y="0" width="250" height="92" rx="10" fill="#fff9db" stroke="#e8590c"/>
+<text x="350" y="26" font-size="15" font-weight="600" fill="#212529">fetch_features.py</text>
+<text x="350" y="48" font-size="11.5" fill="#495057">one row per drug x ATC code x route;</text>
+<text x="350" y="63" font-size="11.5" fill="#495057">rules 3, 4 and 5 applied</text>
+<rect x="336" y="136" width="250" height="92" rx="10" fill="#fff9db" stroke="#e8590c"/>
+<text x="350" y="162" font-size="15" font-weight="600" fill="#212529">RDKit descriptors</text>
+<text x="350" y="184" font-size="11.5" fill="#495057">MW, cLogP, MR, TPSA, QED</text>
+<text x="350" y="199" font-size="11.5" fill="#495057">and its eight terms</text>
+<rect x="336" y="272" width="250" height="92" rx="10" fill="#fff9db" stroke="#e8590c"/>
+<text x="350" y="298" font-size="15" font-weight="600" fill="#212529">dock.py</text>
+<text x="350" y="320" font-size="11.5" fill="#495057">Meeko + AutoDock Vina into the</text>
+<text x="350" y="335" font-size="11.5" fill="#495057">orthosteric site; 20 poses each</text>
+<rect x="336" y="408" width="250" height="92" rx="10" fill="#fff9db" stroke="#e8590c"/>
+<text x="350" y="434" font-size="15" font-weight="600" fill="#212529">qed_report.py</text>
+<text x="350" y="456" font-size="11.5" fill="#495057">per-property distributions,</text>
+<text x="350" y="471" font-size="11.5" fill="#495057">mols2grid structure grid</text>
+<rect x="336" y="544" width="250" height="92" rx="10" fill="#fff9db" stroke="#e8590c"/>
+<text x="350" y="570" font-size="15" font-weight="600" fill="#212529">validate.py</text>
+<text x="350" y="592" font-size="11.5" fill="#495057">13 cross-checks against a</text>
+<text x="350" y="607" font-size="11.5" fill="#495057">second source or the structure</text>
+<path d="M598 150 L658 150" stroke="#868e96" stroke-width="1.5" marker-end="url(#head)"/>
+<text x="672" y="-40" font-size="20" font-weight="600" fill="#212529">Deliverables</text>
+<rect x="672" y="0" width="250" height="92" rx="10" fill="#ebfbee" stroke="#2f9e44"/>
+<text x="686" y="26" font-size="15" font-weight="600" fill="#212529">h2_features.csv</text>
+<text x="686" y="48" font-size="11.5" fill="#495057">the feature table, every cell</text>
+<text x="686" y="63" font-size="11.5" fill="#495057">with its source</text>
+<rect x="672" y="136" width="250" height="92" rx="10" fill="#ebfbee" stroke="#2f9e44"/>
+<text x="686" y="162" font-size="15" font-weight="600" fill="#212529">binding/ movie</text>
+<text x="686" y="184" font-size="11.5" fill="#495057">ligand entering the pocket,</text>
+<text x="686" y="199" font-size="11.5" fill="#495057">hydrogen bonds snapping in</text>
+<rect x="672" y="272" width="250" height="92" rx="10" fill="#ebfbee" stroke="#2f9e44"/>
+<text x="686" y="298" font-size="15" font-weight="600" fill="#212529">qed_marimo.py</text>
+<text x="686" y="320" font-size="11.5" fill="#495057">one property at a time,</text>
+<text x="686" y="335" font-size="11.5" fill="#495057">structures on hover</text>
+<rect x="672" y="408" width="250" height="92" rx="10" fill="#ebfbee" stroke="#2f9e44"/>
+<text x="686" y="434" font-size="15" font-weight="600" fill="#212529">workbook sheets</text>
+<text x="686" y="456" font-size="11.5" fill="#495057">appended to the source workbook,</text>
+<text x="686" y="471" font-size="11.5" fill="#495057">formulas live</text>
+<path d="M934 150 L994 150" stroke="#868e96" stroke-width="1.5" marker-end="url(#head)"/>
+<text x="1008" y="-40" font-size="20" font-weight="600" fill="#212529">Checks you can see</text>
+<rect x="1008" y="0" width="250" height="92" rx="10" fill="#f3f0ff" stroke="#6741d9"/>
+<text x="1022" y="26" font-size="15" font-weight="600" fill="#212529">redocking 1.15 A</text>
+<text x="1022" y="48" font-size="11.5" fill="#495057">famotidine lands back on its</text>
+<text x="1022" y="63" font-size="11.5" fill="#495057">crystallographic pose</text>
+<rect x="1008" y="136" width="250" height="92" rx="10" fill="#f3f0ff" stroke="#6741d9"/>
+<text x="1022" y="162" font-size="15" font-weight="600" fill="#212529">figures/</text>
+<text x="1022" y="184" font-size="11.5" fill="#495057">structures, distributions,</text>
+<text x="1022" y="199" font-size="11.5" fill="#495057">binding frames</text>
+<rect x="1008" y="272" width="250" height="92" rx="10" fill="#f3f0ff" stroke="#6741d9"/>
+<text x="1022" y="298" font-size="15" font-weight="600" fill="#212529">provenance_*.csv</text>
+<text x="1022" y="320" font-size="11.5" fill="#495057">every request, status and time</text>
+<rect x="1008" y="408" width="250" height="92" rx="10" fill="#f3f0ff" stroke="#6741d9"/>
+<text x="1022" y="434" font-size="15" font-weight="600" fill="#212529">evidence/</text>
+<text x="1022" y="456" font-size="11.5" fill="#495057">screenshots of the source pages</text>
+</svg>
