@@ -1,0 +1,16 @@
+# The H2 run. Open Babel (the `obabel` binary) is needed for the receptor PDBQT in dock.py.
+rdkit>=2024.3
+pandas>=2.0
+numpy>=1.26
+requests>=2.31
+openpyxl>=3.1
+matplotlib>=3.8
+meeko>=0.5
+mols2grid>=2.0
+jinja2>=3.1
+tabulate>=0.9
+marimo>=0.14
+marimo-chem-utils>=0.1
+altair>=5.0
+playwright>=1.44      # only for evidence_shots.py
+cairosvg>=2.7         # only for make_diagram.py's PNG

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>H2 Receptor Binding</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Ligand binding at the histamine H<sub>2</sub> receptor</h1>
+  <p class="sub">Five A02BA antagonists docked into <a href="https://www.rcsb.org/structure/7UL3" target="_blank" rel="noopener">PDB 7UL3</a>,
+  the inactive human H<sub>2</sub> receptor solved with famotidine bound. Coordinates, scores and contacts are real;
+  the approach path is an illustration of entry from the extracellular side, not a simulated trajectory.</p>
+</header>
+
+<main>
+  <div id="stage">
+    <canvas id="scene"></canvas>
+    <div id="caption"></div>
+    <div id="loading">loading structure…</div>
+  </div>
+
+  <aside id="panel">
+    <label class="field">Ligand
+      <select id="ligand"></select>
+    </label>
+
+    <div class="controls">
+      <button id="play">Replay binding</button>
+      <label class="check"><input type="checkbox" id="ghost" checked> Crystallographic famotidine</label>
+      <label class="check"><input type="checkbox" id="spin" checked> Orbit camera</label>
+      <label class="check"><input type="checkbox" id="pocketOnly"> Pocket residues only</label>
+    </div>
+
+    <label class="field">Frame
+      <input type="range" id="scrub" min="0" max="89" value="89">
+    </label>
+
+    <dl id="stats"></dl>
+    <div id="contacts"></div>
+    <div id="hbonds"></div>
+    <p class="note" id="validation"></p>
+  </aside>
+</main>
+
+<script type="importmap">
+{"imports":{"three":"https://cdnjs.cloudflare.com/ajax/libs/three.js/0.169.0/three.module.min.js"}}
+</script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
