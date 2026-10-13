@@ -129,3 +129,43 @@ Run `run_all.bat` from the Anaconda Prompt, or run single steps directly, e.g. `
 * **Literature.** Full-text curation for the 2nd orthogonal assay, where ChEMBL has only one, is not automated. Those rows are flagged.
 * **DrugBank terms.** The website data is for internal, non-commercial research use, and the terms restrict building a
   redistributed database from it. For a published TSV, use the DrugBank academic XML release (CC BY-NC 4.0) and cite DrugBank.
+
+## One chemical group at a time: `h2_features.py` and `qed_properties.py`
+
+Two scripts fill every column of the "Drug Bank Dataset Copy" layout for a single ATC level-3 chemical
+group (drugs that share a target), one row per mode of administration, and then show the
+physicochemical columns one property at a time.
+
+```
+pip install rdkit mols2grid pandas requests matplotlib
+python3 curation/h2_features.py                 # ATC_GROUP=A02BA by default (H2-receptor antagonists)
+python3 curation/qed_properties.py --group-features h2_features/features.csv
+```
+
+In Colab, under the **updated workflow** heading:
+
+```python
+!pip -q install rdkit mols2grid
+!wget -q -O h2_features.py https://raw.githubusercontent.com/DhruvMenon2003/drug-toxicity-qsar-prediction/main/curation/h2_features.py
+!wget -q -O qed_properties.py https://raw.githubusercontent.com/DhruvMenon2003/drug-toxicity-qsar-prediction/main/curation/qed_properties.py
+%env ATC_GROUP=A02BA
+%run h2_features.py
+%run qed_properties.py --group-features h2_features/features.csv --all-drugs <path to explorer/data/drugs.json>
+```
+
+| Script | Writes | What it is for |
+|---|---|---|
+| `h2_features.py` | `h2_features/features.csv`, `features_long.csv`, `provenance.csv`, `structures.png`, `grid.html`, `qed_distribution.png`, `binding_data.json` | the filled table; every API call logged; a 2D structure sheet to check the group by eye |
+| `qed_properties.py` | `qed_properties/property_<name>.png` (one per property), `qed_desirability.png`, `qed_vs_property.png`, `grid_qed.html`, `properties.csv` | each property on its own against the whole curated set, and QED taken apart into the eight desirability functions it averages |
+| `explorer/qed_properties_marimo.py` | — | the same thing interactively (marimo + mols2grid + marimo-chem-utils), with a property picker and a percentile slice you can look at as structures |
+| `explorer/binding/build_binding.py` | `explorer/binding/data/receptors.json` | the receptor topology and ligand conformers the [Ligand Binding Theatre](../explorer/binding/README.md) animates |
+
+Rules the table follows, with the reason written into its own `Evidence` column:
+
+- a cell stays **empty** unless a source answered for it, and the reason is logged; nothing is filled from memory
+- SMILES come from PubChem only
+- in vitro activity is the **median pChEMBL at the mechanism target**, and only when at least two documents agree
+- in vitro toxicity is the best human **off-target** pChEMBL under the same two-document rule
+- a drug whose ChEMBL record has no mechanism row borrows the target the rest of the ATC group agrees on, and the row says so
+- at most two routes per drug, intravenous excluded from the two and kept as an extra row (project rules 3 and 4)
+- `Therapeutic Index` and `In Vivo Free Drug Concentration` are written as **Excel formulas**, so they compute themselves the moment the in vivo numbers are entered: `=IF(COUNT(X3,Y3)=2,LOG10(X3)-LOG10(1/Y3),"")` and `=IF(COUNT(AA3,AB3,AC3,AD3)=4,1.44*AA3*AB3*AC3/AD3,"")`

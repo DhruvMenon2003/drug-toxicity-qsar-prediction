@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ligand Binding Theatre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500&display=swap">
+<link rel="stylesheet" href="binding.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Ligand Binding Theatre</h1>
+    <p class="sub">Molecules grouped by the receptor they act on, each one flown into its binding pocket.
+      Ligand coordinates are RDKit conformers of the PubChem structure; the receptor's helices, pocket
+      residues and disulfide come from UniProt; affinities are ChEMBL medians.
+      <a href="../index.html">Back to Hansch space</a></p>
+  </header>
+
+  <div class="main">
+    <div class="stage">
+      <canvas id="scene" aria-label="Animated three-dimensional view of a drug binding to its receptor"></canvas>
+      <div class="hud" id="hud"></div>
+      <div class="controls">
+        <button id="play" class="primary">Pause</button>
+        <input id="scrub" type="range" min="0" max="1000" value="0" step="1" aria-label="Scrub the binding sequence">
+        <span id="beat" class="beat">approach</span>
+        <button id="spin" aria-pressed="true">Orbit on</button>
+      </div>
+    </div>
+
+    <aside class="rail">
+      <section>
+        <h2>Target group</h2>
+        <div id="groups" class="chips"></div>
+      </section>
+      <section>
+        <h2>Molecule</h2>
+        <div id="ligands" class="chips"></div>
+      </section>
+      <section id="facts">
+        <h2>What you are looking at</h2>
+        <dl id="factlist"></dl>
+      </section>
+      <section>
+        <h2>How honest is the picture?</h2>
+        <p class="note" id="caveat"></p>
+      </section>
+    </aside>
+  </div>
+</div>
+<script type="module" src="binding.js"></script>
+</body>
+</html>
