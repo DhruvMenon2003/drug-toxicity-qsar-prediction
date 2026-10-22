@@ -1,0 +1,98 @@
+{
+  "assay_confidence_counts": {
+    "8": 2218,
+    "9": 7914
+  },
+  "assay_organism_counts": {
+    "Cavia porcellus": 57,
+    "Cercopithecidae": 20,
+    "Cricetulus griseus": 2,
+    "Homo sapiens": 7951,
+    "Rattus norvegicus": 25,
+    "Sus scrofa": 26,
+    "unknown": 2051
+  },
+  "assay_organisms": [
+    "Cavia porcellus",
+    "Cercopithecidae",
+    "Cricetulus griseus",
+    "Homo sapiens",
+    "None",
+    "Rattus norvegicus",
+    "Sus scrofa"
+  ],
+  "assay_type": "B",
+  "chembl_status": {
+    "activities": 24527044,
+    "chembl_db_version": "ChEMBL_37",
+    "chembl_release_date": "2026-05-01",
+    "compound_records": 3824604,
+    "disinct_compounds": 2921148,
+    "publications": 101100,
+    "status": "UP",
+    "targets": 18552
+  },
+  "filter_counts": [
+    {
+      "dropped": 17760,
+      "reason": "standard_type != Ki",
+      "rows_in": 32602,
+      "rows_out": 14842
+    },
+    {
+      "dropped": 2855,
+      "reason": "standard_relation != =",
+      "rows_in": 14842,
+      "rows_out": 11987
+    },
+    {
+      "dropped": 0,
+      "reason": "standard_units != nM",
+      "rows_in": 11987,
+      "rows_out": 11987
+    },
+    {
+      "dropped": 30,
+      "reason": "pchembl_value missing or nonfinite",
+      "rows_in": 11987,
+      "rows_out": 11957
+    },
+    {
+      "dropped": 0,
+      "reason": "assay confidence_score < 8 or missing",
+      "rows_in": 11957,
+      "rows_out": 11957
+    },
+    {
+      "dropped": 0,
+      "reason": "data_validity_comment nonnull",
+      "rows_in": 11957,
+      "rows_out": 11957
+    },
+    {
+      "dropped": 1297,
+      "reason": "potential_duplicate != 0",
+      "rows_in": 11957,
+      "rows_out": 10660
+    },
+    {
+      "dropped": 528,
+      "reason": "assay_type != B",
+      "rows_in": 10660,
+      "rows_out": 10132
+    }
+  ],
+  "gene_symbol": "DRD2",
+  "missing_assay_ids": [],
+  "mw_cutoff_Da": 1000,
+  "organism": "Homo sapiens",
+  "retained_activities": 10132,
+  "retained_molecule_ids": 8055,
+  "retained_smiles": 8042,
+  "retained_standardized_compounds": 250,
+  "standard_type": "Ki",
+  "target_chembl_id": "CHEMBL217",
+  "target_name": "D(2) dopamine receptor",
+  "target_type": "SINGLE PROTEIN",
+  "uniprot_accession": "P14416"
+}
