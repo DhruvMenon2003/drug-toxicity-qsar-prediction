@@ -132,33 +132,86 @@ Run `run_all.bat` from the Anaconda Prompt, or run single steps directly, e.g. `
 
 ## Reproducible single-target Hansch QSAR
 
-Open [`hansch_drd2.ipynb`](hansch_drd2.ipynb) in a fresh Google Colab runtime and run all cells.
-It uses one human target record (DRD2 / CHEMBL217 / UniProt P14416), binding assays (`B`),
-and `Ki` measurements expressed only as pChEMBL. No API key or GPU is needed.
+Open [`hansch_drd2.ipynb`](hansch_drd2.ipynb) in a fresh Google Colab runtime and run every
+cell in order. The notebook now explains the complete path from collection to interpretation,
+with the exact attrition counts, descriptor-removal decisions, validation rationale and a
+worked record trail. Its scope is one human target record (DRD2 / CHEMBL217 / UniProt P14416),
+binding assays (`B`), and `Ki` expressed only as pChEMBL (pKi). No API key or GPU is needed.
 
-The first cell installs and prints exact dependency versions. By default, the notebook
+| Question | Read in the notebook | Inspect in the committed results |
+|---|---|---|
+| What was collected and excluded? | A1 endpoint, confidence, species and pKi explanation | `selection.json`, `raw_activities.csv`, source provenance |
+| What is one compound and one response? | A2 normalization, two-document rule and spread cutoff | `dataset.csv`, `dropped.csv` |
+| Why these descriptors and which survived? | A3/A4 descriptor meanings and removed-pair table | `candidate_features.csv`, `features.csv`, `feature_selection.json` |
+| Does the association predict unseen compounds? | Validation design and interpretation | `model.json`, `predictions.csv`, five diagnostic figures |
+| Can I replay or trace a point to its source? | A6 and the final worked CHEMBL8946 record trail | `reproducibility.json`, cached responses, `source_provenance.csv` |
+
+The frozen ChEMBL 37 snapshot starts with 32,602 target activity rows. Selecting Ki and
+the exact eligibility rules leaves 10,132 rows. After 22 missing-structure rows are
+removed, 7,980 standardized compound groups are evaluated: 7,558 fail only the document
+rule, 79 fail only the spread rule, and 93 fail both. **250 compounds remain**; none is
+removed by the 1000 Da cutoff. Those counting units differ: activity rows are not compounds.
+Confidence ≥8 is applied exactly as requested. It includes homologous or unspecified-source
+assays assigned to the human target, which the notebook reports rather than conceals.
+
+The model begins with 11 whole-molecule descriptors. The full-data and scaffold-training
+fits each remove MolMR in favor of MolWt, and MolLogP² in favor of MolLogP, under the
+pairwise-correlation rule. Both retain nine descriptors. Classical Hansch substituent π
+is distinguished from this notebook's whole-molecule MolLogP proxy; MolMR is explained as
+a size/polarizability proxy and QED as a composite, not an independent potency measurement.
+Neutralization provides a consistent representation, not a physiological protonation state.
+
+Descriptor selection is repeated within the scaffold holdout, five-fold scaffold CV,
+every LOO fold and every one of 100 y-scrambles. The requested 80/20 holdout achieves
+195/55 compounds (78/22) under the fixed whole-scaffold rule. The frozen model is
+**not predictive**: scaffold-test r² is −0.089821, five-fold scaffold q² is −0.284990 and
+LOO q² is 0.071419. The real in-sample r² (0.151520) exceeds the largest scrambled fit
+(0.126145), but passing this null check does not repair poor prediction. Coefficient
+p-values are exploratory after selection; associations and conditional surface changes
+do not establish mechanisms or useful chemical interventions.
+
+The first cell installs and prints exact dependency versions. By default the notebook
 downloads the immutable, SHA-256-verified [`hansch_drd2_cache.zip`](hansch_drd2_cache.zip),
-then performs the analysis without live API requests. A local copy of the archive is
-also supported. Set `QSAR_OUTPUT_DIR` to change the output folder; the default is
-`hansch_drd2/`. `QSAR_LIVE_REFRESH=1` opts into a new live ChEMBL snapshot in a separate
-cache, which may yield different results and must be audited as a new dataset.
+then uses cached responses for the entire analysis. A local archive is also supported
+via `QSAR_SNAPSHOT_ARCHIVE`. `QSAR_OUTPUT_DIR` changes the output folder (default
+`hansch_drd2/`). Leave `QSAR_LIVE_REFRESH` unset to reproduce the frozen result;
+`QSAR_LIVE_REFRESH=1` deliberately creates a new live snapshot in a separate default cache.
 
-The frozen dataset contains 250 standardized compounds, each supported by at least two
-documents with replicate spread at most one pChEMBL unit. The notebook performs nested
-descriptor selection for the scaffold holdout, five-fold scaffold CV, LOO and all 100
-Y-scrambles. The requested 80/20 holdout achieves 195/55 (78/22) using the fixed whole-scaffold
-selection rule. The final cell repeats the complete pipeline from cache and asserts
-byte-identical `model.json` output. The model is **not predictive**, as documented in the
-validation results; the full-data fit is an exploratory description rather than a validated
-prediction tool.
+The final code cell repeats the complete pipeline from cache and requires identical
+`model.json` bytes. The committed verified model SHA-256 is
+`622ba5d1d93e3ff4eee49b665e0ceeb8645785713ce5660eb8765f2b513aef23`.
+The full execution and replay were checked under the pinned Python 3.12 runtime;
+the hosted Colab browser runtime was not exercised. Original source requests are preserved
+separately and imported once into provenance; later cache reads append audit rows.
 
-Committed outputs are under [`results/hansch_drd2/`](results/hansch_drd2/): raw and curated
-CSV files, candidate and retained descriptors, exclusion reasons, model and prediction
-tables, validation metadata, provenance, five diagnostic figures, and the verdict.
-The compact `qsar_drd2.json` is copied without changes into both `data/qsar_drd2.json`
-and `site/data/qsar_drd2.json` in `drug-hansch-space`, where the existing home explorer
-loads it in its QSAR overlay. Training-model predictions, surface and applicability domain
-are distinguished from the full-data descriptive coefficient table.
+Committed evidence is under [`results/hansch_drd2/`](results/hansch_drd2/). To trace one
+point, follow InChIKey `AADCDMQTJNYOSS-LBPRGKRZSA-N` from the exported predictions into
+`dataset.csv`, then molecule CHEMBL8946 into `raw_activities.csv`: its three documents
+support pChEMBL values 10.07, 9.59 and 9.93, a median of 9.93 and a spread of 0.48.
+The notebook continues the trail through descriptors, test prediction, domain flag,
+cached request metadata and publication IDs. Rejected cases have their own trail in
+`dropped.csv`.
+
+The unchanged compact `qsar_drd2.json` is copied into `data/qsar_drd2.json` and
+`site/data/qsar_drd2.json` in `drug-hansch-space`. The existing home explorer reads it
+in the QSAR overlay. Its primary predictions, surface and applicability domain use the
+training-only model; the full-data coefficient table is separately descriptive. Surface
+grids hold other descriptors fixed and need not represent chemically possible molecules.
+
+Official methods references are linked at their relevant explanations and collected at
+the notebook's end: ChEMBL data definitions, the original Hansch/Fujita and Wildman/Crippen
+papers, the original QED paper, RDKit descriptor/standardization documentation, scikit-learn
+leakage guidance and statsmodels OLS documentation. The executed code and data remain the
+source of all numerical claims above.
+
+### Teaching reference reviewed
+
+The user supplied [Santiago Bolivar’s interactive QSAR notebook](https://github.com/Sbolivar16/QSAR_Tools/blob/cf2514d10038252627d397d2164741077ff5d06f/QSAR_Universal_Interactive.ipynb).
+Its stage explanations, curation report and export guide are useful presentation references.
+We inspected its source without executing or importing it. Its classification workflow differs
+from this fixed DRD2 pKi regression: units are not filtered before naming activity values nM,
+and preprocessing is fitted before the holdout split/CV. We retain explicit unit eligibility,
+fold-local selection and measured-residual Williams diagnostics. No code or model values changed.
 
 ## One chemical group at a time: `h2_features.py` and `qed_properties.py`
 
