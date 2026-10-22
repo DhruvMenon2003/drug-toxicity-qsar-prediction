@@ -1,0 +1,27 @@
+{
+  "assay_organism_counts": {
+    "Cavia porcellus": 57,
+    "Cercopithecidae": 20,
+    "Cricetulus griseus": 2,
+    "Homo sapiens": 7951,
+    "Rattus norvegicus": 25,
+    "Sus scrofa": 26,
+    "unknown": 2051
+  },
+  "cache_body_bytes": 28546819,
+  "cache_responses": 21,
+  "confidence_counts": {
+    "8": 2218,
+    "9": 7914
+  },
+  "http_statuses": {
+    "200": 21
+  },
+  "missing_smiles_rows": 22,
+  "passed": true,
+  "provenance_rows": 21,
+  "strict_activity_count": 10132,
+  "total_filter_drops": 22470,
+  "unique_assays": 2481,
+  "unique_ki_activities": 14842
+}

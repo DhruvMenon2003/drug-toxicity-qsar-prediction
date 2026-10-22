@@ -1,0 +1,60 @@
+{
+  "timestamp_utc": "2026-10-22T16:12:38.309606+00:00",
+  "model_sha256": "622ba5d1d93e3ff4eee49b665e0ceeb8645785713ce5660eb8765f2b513aef23",
+  "checks_passed": [
+    "Exact dataset matches separately standardized A1 probe: 250 unique compounds, at least 2 documents, replicate spread at most 1 log unit.",
+    "Seed-42 Murcko split reproduced: 195 training and 55 test compounds; 148 scaffolds with no overlap.",
+    "Independent least-squares coefficients, standard errors, p-values, VIF, descriptor cap/correlation, predictions and Williams applicability domain agree.",
+    "All five scaffold CV folds and all 250 leave-one-out models reproduce predictions and q2 with nested descriptor selection.",
+    "All 100 y-scrambling fits independently reproduced; real r2 exceeds the null maximum; empirical p = 1/101.",
+    "Not-predictive verdict matches negative scaffold scores; all 250 exported records match the analysis.",
+    "No known credential or private-key signatures in notebook or exported JSON.",
+    "Final delivered notebook code exactly matches executed cells; complete cache-only repeat produced byte-identical model JSON."
+  ],
+  "n": 250,
+  "model_verdict": "not predictive",
+  "metrics": {
+    "train": {
+      "n": 195,
+      "r2": 0.16317618058355754,
+      "rmse": 0.9679583609924542
+    },
+    "test": {
+      "n": 55,
+      "r2": -0.08982135833316751,
+      "rmse": 1.2564908301970255
+    },
+    "loo": {
+      "method": "leave_one_compound_out_with_nested_selection",
+      "n": 250,
+      "q2": 0.07141942888493447,
+      "r2": 0.07141942888493447,
+      "rmse": 1.0539861583367787
+    }
+  },
+  "cv_q2": -0.2849895700734302,
+  "limits": [
+    "Colab browser runtime was not exercised; executed under pinned Python 3.12 runtime.",
+    "Notebook end-to-end execution was performed by root; independent QA reconstructed all scientific calculations and verified final execution evidence."
+  ],
+  "final_metadata_delta": "Only sources.snapshot_sha256 was added after initial numeric audit; every other JSON value is identical.",
+  "notebook_code_sha256": "e9d2c6a14b462f72bd126b8cbc097267128588c1f04e8ad1fee5cf1475d8dd89",
+  "executed_notebook_sha256": "62929c401fabd4e886068021aa135892cfd39a73368336f267d88804f0d0bfcb",
+  "reproducibility": {
+    "cache_only_model_bytes_identical": true,
+    "model_sha256": "622ba5d1d93e3ff4eee49b665e0ceeb8645785713ce5660eb8765f2b513aef23",
+    "seed": 42,
+    "versions": {
+      "matplotlib": "3.10.8",
+      "numpy": "2.3.5",
+      "pandas": "2.2.3",
+      "rdkit": "2025.9.6",
+      "requests": "2.32.5",
+      "scikit-learn": "1.8.0",
+      "scipy": "1.17.0",
+      "statsmodels": "0.14.6"
+    }
+  },
+  "execution_evidence": "Root executed every unchanged code cell using pinned IPython after ZeroMQ kernel startup was blocked; independently verified exact delivered code identity, successful final cache-only assertion output, and model hash. Independently rebuilt scientific computations as recorded above.",
+  "optimization_review": "The site CID mapping prefilter compares molecular formula after identical salt/solvent/charge/fragment preparation. Canonical tautomer enumeration preserves formula, so this is a safe necessary-condition screen. Original and optimized exports were compared; every prediction, descriptor, CID and metric is identical."
+}

@@ -130,6 +130,36 @@ Run `run_all.bat` from the Anaconda Prompt, or run single steps directly, e.g. `
 * **DrugBank terms.** The website data is for internal, non-commercial research use, and the terms restrict building a
   redistributed database from it. For a published TSV, use the DrugBank academic XML release (CC BY-NC 4.0) and cite DrugBank.
 
+## Reproducible single-target Hansch QSAR
+
+Open [`hansch_drd2.ipynb`](hansch_drd2.ipynb) in a fresh Google Colab runtime and run all cells.
+It uses one human target record (DRD2 / CHEMBL217 / UniProt P14416), binding assays (`B`),
+and `Ki` measurements expressed only as pChEMBL. No API key or GPU is needed.
+
+The first cell installs and prints exact dependency versions. By default, the notebook
+downloads the immutable, SHA-256-verified [`hansch_drd2_cache.zip`](hansch_drd2_cache.zip),
+then performs the analysis without live API requests. A local copy of the archive is
+also supported. Set `QSAR_OUTPUT_DIR` to change the output folder; the default is
+`hansch_drd2/`. `QSAR_LIVE_REFRESH=1` opts into a new live ChEMBL snapshot in a separate
+cache, which may yield different results and must be audited as a new dataset.
+
+The frozen dataset contains 250 standardized compounds, each supported by at least two
+documents with replicate spread at most one pChEMBL unit. The notebook performs nested
+descriptor selection for the scaffold holdout, five-fold scaffold CV, LOO and all 100
+Y-scrambles. The requested 80/20 holdout achieves 195/55 (78/22) using the fixed whole-scaffold
+selection rule. The final cell repeats the complete pipeline from cache and asserts
+byte-identical `model.json` output. The model is **not predictive**, as documented in the
+validation results; the full-data fit is an exploratory description rather than a validated
+prediction tool.
+
+Committed outputs are under [`results/hansch_drd2/`](results/hansch_drd2/): raw and curated
+CSV files, candidate and retained descriptors, exclusion reasons, model and prediction
+tables, validation metadata, provenance, five diagnostic figures, and the verdict.
+The compact `qsar_drd2.json` is copied without changes into both `data/qsar_drd2.json`
+and `site/data/qsar_drd2.json` in `drug-hansch-space`, where the existing home explorer
+loads it in its QSAR overlay. Training-model predictions, surface and applicability domain
+are distinguished from the full-data descriptive coefficient table.
+
 ## One chemical group at a time: `h2_features.py` and `qed_properties.py`
 
 Two scripts fill every column of the "Drug Bank Dataset Copy" layout for a single ATC level-3 chemical
